@@ -29,10 +29,15 @@ logger = logging.getLogger("benchmark.student_agent")
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
-# Marker the student outputs when the learning task is complete (end of response)
-# Match flexibly: [TASK_COMPLETE], [ TASK_COMPLETE ], etc.
-TASK_COMPLETE_MARKER = "[TASK_COMPLETE]"
+# ReAct action markers: [ACTION: solve], [ACTION: generate_problem], [ACTION: task_complete]
+# Also support legacy [TASK_COMPLETE] as task_complete
+ACTION_RE = re.compile(
+    r"\[\s*ACTION\s*:\s*(solve|generate_problem|task_complete)\s*\]",
+    re.IGNORECASE,
+)
 TASK_COMPLETE_RE = re.compile(r"\[\s*TASK_COMPLETE\s*\]", re.IGNORECASE)
+
+VALID_ACTIONS = frozenset({"solve", "generate_problem", "task_complete"})
 
 
 def _load_student_prompt_template() -> str:
@@ -120,12 +125,19 @@ class StudentAgent:
         self.turn_count: int = 0
 
     @classmethod
-    def from_entry(cls, entry: dict, **kwargs) -> "StudentAgent":
+    def from_entry(
+        cls,
+        entry: dict,
+        prior_sessions_context: str | None = None,
+        **kwargs,
+    ) -> "StudentAgent":
         """
         Create a StudentAgent from a benchmark entry.
 
         Args:
             entry: Benchmark entry dict with profile, gaps, task
+            prior_sessions_context: Optional summary of previous sessions (student
+                "remembers" this). Injected at start of system prompt.
             **kwargs: Override temperature, max_tokens, etc.
 
         Returns:
@@ -154,6 +166,14 @@ class StudentAgent:
             unknown=_format_list(knowledge_state.get("unknown", [])),
             beliefs=_build_beliefs_text(gaps),
         )
+
+        if prior_sessions_context:
+            system_prompt = (
+                "# Prior Sessions (you remember these)\n"
+                f"{prior_sessions_context}\n\n"
+                "---\n\n"
+                + system_prompt
+            )
 
         first_message = task.get("initial_message", "Hi, I need help with this topic.")
 
@@ -184,22 +204,25 @@ class StudentAgent:
         """
         Get the student's first message (from task.initial_message).
 
-        Also records it in history.
+        Also records it in history. Initial message implicitly has action "solve".
         """
-        self.history.append({"role": "assistant", "content": self.first_message})
+        self.history.append({
+            "role": "assistant",
+            "content": self.first_message,
+            "action": "solve",
+        })
         self.turn_count = 1
         return self.first_message
 
-    async def respond(self, tutor_message: str) -> tuple[str, bool]:
+    async def respond(self, tutor_message: str) -> tuple[str, str]:
         """
-        Generate a student response to a tutor message.
+        Generate a student response to a tutor message (ReAct paradigm).
 
         Args:
             tutor_message: The tutor's latest message
 
         Returns:
-            Tuple of (response_text, task_complete). task_complete is True when
-            the student outputs [TASK_COMPLETE] indicating the learning task is done.
+            Tuple of (message, action). action is one of: solve, generate_problem, task_complete.
         """
         # Record tutor message
         self.history.append({"role": "user", "content": tutor_message})
@@ -219,27 +242,42 @@ class StudentAgent:
             max_tokens=self.max_tokens,
         )
 
-        # Check for task-complete marker and strip it
-        task_complete = bool(TASK_COMPLETE_RE.search(response))
-        cleaned = TASK_COMPLETE_RE.sub("", response).strip()
+        # Parse action: [ACTION: solve|generate_problem|task_complete] or legacy [TASK_COMPLETE]
+        action = "solve"  # default
+        action_match = ACTION_RE.search(response)
+        if action_match:
+            action = action_match.group(1).lower()
+        elif TASK_COMPLETE_RE.search(response):
+            action = "task_complete"
 
-        # Record cleaned response in history (no marker in transcript)
-        self.history.append({"role": "assistant", "content": cleaned})
+        # Strip all action markers from message
+        cleaned = ACTION_RE.sub("", response)
+        cleaned = TASK_COMPLETE_RE.sub("", cleaned)
+        cleaned = cleaned.strip()
+
+        # Record in history with action metadata
+        self.history.append({"role": "assistant", "content": cleaned, "action": action})
         self.turn_count += 1
 
-        return (cleaned, task_complete)
+        return (cleaned, action)
 
-    def get_transcript(self) -> list[dict[str, str]]:
+    def get_transcript(self) -> list[dict]:
         """
         Get the full conversation transcript.
 
         Returns:
-            List of messages with roles normalized to "student"/"tutor".
+            List of messages with roles "student"/"tutor". Student messages include
+            "action" (solve, generate_problem, or task_complete) when available.
         """
         transcript = []
         for msg in self.history:
             role = "student" if msg["role"] == "assistant" else "tutor"
-            transcript.append({"role": role, "content": msg["content"]})
+            entry = {"role": role, "content": msg["content"]}
+            if role == "student" and "action" in msg:
+                entry["action"] = msg["action"]
+            elif role == "student":
+                entry["action"] = "solve"  # default for initial message
+            transcript.append(entry)
         return transcript
 
     def get_metadata(self) -> dict[str, Any]:

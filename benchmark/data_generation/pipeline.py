@@ -36,7 +36,7 @@ import yaml
 from benchmark.data_generation.gap_generator import generate_gaps_for_profiles
 from benchmark.data_generation.profile_generator import generate_profiles_for_kb
 from benchmark.data_generation.scope_generator import generate_knowledge_scope
-from benchmark.data_generation.task_generator import generate_tasks
+from benchmark.data_generation.task_generator import generate_tasks_with_partition
 
 logger = logging.getLogger("benchmark.pipeline")
 
@@ -217,10 +217,8 @@ class DataGenerationPipeline:
         )
         self.gaps[kb_name] = profile_gaps
 
-        # Stage 5: Generate tasks per profile → one entry per task
-        logger.info(f"[Stage 5] Generating tasks for '{kb_name}'...")
-        task_cfg = self.config.get("task_generation", {})
-        tasks_per_profile = task_cfg.get("tasks_per_combo", 2)
+        # Stage 5: Generate tasks per profile (each gap → exactly one task)
+        logger.info(f"[Stage 5] Generating tasks for '{kb_name}' (partition: each gap in one task)...")
 
         for profile in profiles:
             profile_id = profile.get("profile_id", "unknown")
@@ -231,11 +229,10 @@ class DataGenerationPipeline:
                 continue
 
             try:
-                tasks = await generate_tasks(
+                tasks = await generate_tasks_with_partition(
                     knowledge_scope=scope,
                     student_profile=profile,
                     knowledge_gaps=gaps,
-                    num_tasks=tasks_per_profile,
                 )
 
                 # Build gap lookup for resolving target_gaps
