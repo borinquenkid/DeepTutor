@@ -321,6 +321,7 @@ async def _openai_complete(
             lightrag_kwargs.pop("api_version", None)
 
             if _needs_thinking_off:
+                lightrag_kwargs["enable_thinking"] = False
                 lightrag_kwargs.setdefault("extra_body", {})
                 lightrag_kwargs["extra_body"]["enable_thinking"] = False  # type: ignore[index]
 
