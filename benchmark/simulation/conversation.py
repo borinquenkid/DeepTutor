@@ -239,6 +239,7 @@ async def deep_tutor_respond(
         kb_name=kb_name,
         question=student_message,
         language=language,
+        enabled_tools=["rag_search", "code_execute", "reason"],
     )
     answer = (result.get("answer") or "").strip()
     return answer or "(No answer generated.)"

@@ -119,6 +119,7 @@ async def _process_pdf(
     profile_cfg: dict,
     rag_cfg: dict,
     output_dir: Path,
+    skip_processing: bool,
     skip_extract: bool,
     use_mineru_api: bool,
     mineru_api_token: str | None,
@@ -130,50 +131,31 @@ async def _process_pdf(
     logger.info("KB : %s", kb_name)
     logger.info("=" * 70)
 
-    initializer = KnowledgeBaseInitializer(
+    if not skip_processing:
+        initializer = KnowledgeBaseInitializer(
+            kb_name=kb_name,
+            base_dir=str(kb_base_dir),
+        )
+        initializer.create_directory_structure()
+        copied = initializer.copy_documents([str(pdf_path)])
+        if not copied:
+            raise RuntimeError(f"Failed to copy PDF: {pdf_path}")
+
+        await initializer.process_documents(
+            use_mineru_api=use_mineru_api,
+            mineru_api_token=mineru_api_token,
+            mineru_model_version=mineru_model_version,
+        )
+
+    return await _run_post_gpu_stage(
+        pdf_path=pdf_path,
         kb_name=kb_name,
-        base_dir=str(kb_base_dir),
+        kb_base_dir=kb_base_dir,
+        profile_cfg=profile_cfg,
+        rag_cfg=rag_cfg,
+        output_dir=output_dir,
+        skip_extract=skip_extract,
     )
-    initializer.create_directory_structure()
-    copied = initializer.copy_documents([str(pdf_path)])
-    if not copied:
-        raise RuntimeError(f"Failed to copy PDF: {pdf_path}")
-
-    await initializer.process_documents(
-        use_mineru_api=use_mineru_api,
-        mineru_api_token=mineru_api_token,
-        mineru_model_version=mineru_model_version,
-    )
-    if not skip_extract:
-        initializer.extract_numbered_items()
-
-    scope = await generate_knowledge_scope(
-        kb_name=kb_name,
-        seed_queries=rag_cfg.get("seed_queries"),
-        mode=rag_cfg.get("mode", "naive"),
-        kb_base_dir=str(kb_base_dir),
-    )
-
-    profiles = await generate_profiles_for_kb(
-        knowledge_scope=scope,
-        background_types=profile_cfg.get(
-            "background_types", ["beginner", "intermediate", "advanced"]
-        ),
-        profiles_per_kb=profile_cfg.get("profiles_per_subtopic", 3),
-    )
-
-    out = {
-        "pdf_file": str(pdf_path),
-        "kb_name": kb_name,
-        "knowledge_scope": scope,
-        "profiles": profiles,
-        "num_profiles": len(profiles),
-    }
-    out_path = output_dir / f"{kb_name}.json"
-    with open(out_path, "w", encoding="utf-8") as f:
-        json.dump(out, f, ensure_ascii=False, indent=2)
-    logger.info("Saved: %s", out_path)
-    return out
 
 
 async def _run_gpu_stage_only(
@@ -411,6 +393,11 @@ async def main() -> None:
         help="Skip numbered items extraction for faster initialization",
     )
     parser.add_argument(
+        "--skip-processing",
+        action="store_true",
+        help="Skip document parsing/processing and reuse existing KB content_list/rag_storage.",
+    )
+    parser.add_argument(
         "--limit",
         type=int,
         default=0,
@@ -502,7 +489,39 @@ async def main() -> None:
         jobs.append((pdf, kb_name))
 
     gpu_ids = _parse_gpu_ids(args.gpu_ids)
-    if args.serial:
+    if args.skip_processing:
+        _runtime_status(
+            f"Start reuse-existing run | mode=skip_processing | total_pdfs={len(jobs)}"
+        )
+        results = []
+        for idx, (pdf_path, kb_name) in enumerate(jobs, start=1):
+            logger.info(
+                "Running reuse-existing pipeline [%d/%d]: %s -> %s",
+                idx,
+                len(jobs),
+                pdf_path.name,
+                kb_name,
+            )
+            try:
+                result = await _run_post_gpu_stage(
+                    pdf_path=pdf_path,
+                    kb_name=kb_name,
+                    kb_base_dir=kb_base_dir,
+                    profile_cfg=profile_cfg,
+                    rag_cfg=rag_cfg,
+                    output_dir=output_dir,
+                    skip_extract=args.skip_extract,
+                )
+                results.append(result)
+            except Exception as e:
+                logger.exception(
+                    "Reuse-existing pipeline failed on %s -> %s: %s",
+                    pdf_path.name,
+                    kb_name,
+                    e,
+                )
+                raise SystemExit(1)
+    elif args.serial:
         _runtime_status(
             f"Start serial run | gpus={','.join(gpu_ids[:MAX_CONCURRENCY])} | "
             f"mode={'mineru_api' if args.use_mineru_api else 'local'} | total_pdfs={len(jobs)}"
@@ -524,6 +543,7 @@ async def main() -> None:
                     profile_cfg=profile_cfg,
                     rag_cfg=rag_cfg,
                     output_dir=output_dir,
+                    skip_processing=args.skip_processing,
                     skip_extract=args.skip_extract,
                     use_mineru_api=args.use_mineru_api,
                     mineru_api_token=args.mineru_api_token,

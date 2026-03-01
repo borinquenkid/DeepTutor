@@ -46,8 +46,6 @@ async def run_factory_test(prompt: str, system_prompt: str, max_tokens: int, tem
         system_prompt=system_prompt,
         max_tokens=max_tokens,
         temperature=temperature,
-        enable_thinking=False,
-        extra_body={"enable_thinking": False},
     )
     text = (answer or "").strip()
     print("[FactoryTest] OK")
@@ -70,10 +68,6 @@ async def run_direct_test(prompt: str, system_prompt: str, max_tokens: int, temp
         ],
         "max_tokens": max_tokens,
         "temperature": temperature,
-        # For raw HTTP, send top-level toggle directly.
-        "enable_thinking": False,
-        # Keep extra_body for gateways that parse OpenAI-SDK style fields.
-        "extra_body": {"enable_thinking": False},
     }
 
     print(f"[DirectTest] POST {url}")

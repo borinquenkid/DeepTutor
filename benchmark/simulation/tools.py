@@ -31,6 +31,7 @@ import yaml
 from src.personalization.memory_reader import MemoryReader, _workspace_reader_var
 from src.personalization.trace_forest import TraceForest
 from src.personalization.trace_tree import TraceNode, TraceTree
+from src.agents.solve.tools import ToolRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +61,8 @@ async def solve_question(
     kb_name: str,
     question: str,
     language: str = "en",
+    enabled_tools: list[str] | None = None,
+    enable_memory: bool = True,
 ) -> dict[str, Any]:
     """Solve a question with the full Plan → ReAct → Write pipeline.
 
@@ -72,24 +75,34 @@ async def solve_question(
     completed_steps, citations.
     """
     session = WorkspaceSession(workspace)
-    forest = TraceForest(memory_dir=session.memory_dir)
-    reader = MemoryReader(forest=forest)
-    token = _workspace_reader_var.set(reader)
+    forest: TraceForest | None = None
+    token = None
+    if enable_memory:
+        forest = TraceForest(memory_dir=session.memory_dir)
+        reader = MemoryReader(forest=forest)
+        token = _workspace_reader_var.set(reader)
 
     try:
         from src.agents.solve import MainSolver
+
+        tool_registry = (
+            ToolRegistry.create_from_names(enabled_tools, language=language)
+            if enabled_tools is not None
+            else None
+        )
 
         solver = MainSolver(
             kb_name=kb_name,
             language=language,
             output_base_dir=str(session.solve_dir),
+            tool_registry=tool_registry,
         )
         await solver.ainit()
         result = await solver.solve(question)
 
         # Build trace from scratchpad and register
         scratchpad_path = Path(result["output_dir"]) / "scratchpad.json"
-        if scratchpad_path.exists():
+        if enable_memory and forest is not None and scratchpad_path.exists():
             scratchpad_data = json.loads(scratchpad_path.read_text("utf-8"))
             answer_path = str(Path(result["output_dir"]) / "final_answer.md")
             tree = TraceTree.from_scratchpad(
@@ -109,7 +122,8 @@ async def solve_question(
             "citations": result.get("citations", []),
         }
     finally:
-        _workspace_reader_var.reset(token)
+        if token is not None:
+            _workspace_reader_var.reset(token)
 
 
 # ======================================================================
@@ -123,6 +137,7 @@ async def generate_questions(
     preferences: str = "",
     num_questions: int = 3,
     language: str = "en",
+    enable_memory: bool = True,
 ) -> dict[str, Any]:
     """Generate multiple-choice questions with memory.
 
@@ -136,9 +151,12 @@ async def generate_questions(
     questions (list of {question_id, question, options, question_type}).
     """
     session = WorkspaceSession(workspace)
-    forest = TraceForest(memory_dir=session.memory_dir)
-    reader = MemoryReader(forest=forest)
-    token = _workspace_reader_var.set(reader)
+    forest: TraceForest | None = None
+    token = None
+    if enable_memory:
+        forest = TraceForest(memory_dir=session.memory_dir)
+        reader = MemoryReader(forest=forest)
+        token = _workspace_reader_var.set(reader)
 
     try:
         from src.agents.question import AgentCoordinator
@@ -159,7 +177,7 @@ async def generate_questions(
         batch_id = Path(batch_dir).name if batch_dir else ""
 
         # Register trace (without answers — deferred until submit_answers)
-        if batch_dir:
+        if enable_memory and forest is not None and batch_dir:
             summary_path = Path(batch_dir) / "summary.json"
             if summary_path.exists():
                 summary_data = json.loads(summary_path.read_text("utf-8"))
@@ -192,7 +210,8 @@ async def generate_questions(
             "questions": questions,
         }
     finally:
-        _workspace_reader_var.reset(token)
+        if token is not None:
+            _workspace_reader_var.reset(token)
 
 
 # ======================================================================
