@@ -283,7 +283,7 @@ async def _run_post_gpu_stage(
     """Run non-GPU stage after documents are processed."""
     initializer = KnowledgeBaseInitializer(kb_name=kb_name, base_dir=str(kb_base_dir))
     if not skip_extract:
-        initializer.extract_numbered_items()
+        await asyncio.to_thread(initializer.extract_numbered_items)
 
     scope = await generate_knowledge_scope(
         kb_name=kb_name,
