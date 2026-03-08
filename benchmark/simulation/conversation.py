@@ -121,6 +121,8 @@ def _get_tutor_input_via_editor(student_context: str) -> str | None:
 TUTOR_POST_COMPLETE_PROMPT = (
     "The student has indicated they are done with this session. "
     "Based on this conversation, please create 5 practice problems that reinforce what was covered. "
+    "Use multiple-choice format where applicable, and ensure distractors are plausible and non-trivial "
+    "(not obviously wrong at first glance). "
     "Give only problem statements (no solutions)."
 )
 PRACTICE_QUESTION_COUNT = 5
@@ -325,14 +327,21 @@ def _build_practice_preferences(
     tutor_history: list[dict[str, str]],
 ) -> str:
     """Build a preferences string from conversation history."""
+    quality_rules = (
+        "Question quality requirements:\n"
+        "- For MCQ, provide 4 options (A-D) with exactly one correct answer.\n"
+        "- Distractors must be plausible and reflect common misconceptions.\n"
+        "- Distractors must NOT be obviously wrong at first glance.\n"
+        "- Keep options balanced in style and length to avoid test-taking shortcuts.\n"
+    )
     if not tutor_history:
-        return ""
+        return quality_rules
     convo_lines = []
     for msg in tutor_history[-16:]:
         role = "Student" if msg.get("role") == "user" else "Tutor"
         text = (msg.get("content", "") or "")[:300]
         convo_lines.append(f"[{role}] {text}")
-    return "Recent conversation:\n" + "\n".join(convo_lines)
+    return quality_rules + "\nRecent conversation:\n" + "\n".join(convo_lines)
 
 
 async def deep_tutor_generate_practice_questions(
@@ -447,7 +456,7 @@ async def mock_tutor_generate_practice_questions(
             "  D. <option>\n"
             "- Exactly ONE option must be correct. The other three are distractors.\n"
             "- Distractors should be plausible (targeting common misconceptions), "
-            "not obviously absurd.\n"
+            "not obviously absurd, and not trivially eliminable at first glance.\n"
             "- Do NOT include the answer or explanation.\n\n"
             f"Previously generated questions:\n{prev}"
         )
