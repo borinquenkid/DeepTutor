@@ -69,7 +69,15 @@ def main() -> None:
         default=str(PROJECT_ROOT / "benchmark" / "data" / "bench_pipeline_multimodel"),
         help="Base output root; each model writes to a subdir",
     )
-    parser.add_argument("--backends", default="mock,deep_tutor")
+    parser.add_argument(
+        "--backends",
+        default="mock,deep_tutor",
+        help=(
+            "Comma-separated backends. "
+            "Supported: mock, deep_tutor, deep_tutor_no_rag, "
+            "deep_tutor_no_memory, deep_tutor_no_rag_memory"
+        ),
+    )
     parser.add_argument("--step2-concurrency", type=int, default=6)
     parser.add_argument("--step2-max-turns", type=int, default=30)
     parser.add_argument("--step2-language", default="en")

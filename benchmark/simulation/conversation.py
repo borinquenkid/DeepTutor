@@ -4,7 +4,7 @@ Conversation Runner - Run multi-turn student-tutor conversations
 
 Supports two modes:
   1. Interactive: Human plays the tutor, types responses in terminal
-  2. Auto: Tutor backend (deep_tutor or mock)
+  2. Auto: Tutor backend (deep_tutor variants or mock)
 
 Usage:
   # Interactive mode (editor by default; use --inline for console input):
@@ -39,6 +39,45 @@ _EDITOR_DELIMITER = "\n\n--- Type your response below this line ---\n\n"
 logger = logging.getLogger("benchmark.conversation")
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+
+SUPPORTED_AUTO_BACKENDS = [
+    "deep_tutor",
+    "deep_tutor_no_rag",
+    "deep_tutor_no_memory",
+    "deep_tutor_no_rag_memory",
+    "mock",
+]
+
+AutoBackend = Literal[
+    "deep_tutor",
+    "deep_tutor_no_rag",
+    "deep_tutor_no_memory",
+    "deep_tutor_no_rag_memory",
+    "mock",
+]
+
+
+def _is_deeptutor_backend(backend: str) -> bool:
+    return backend.startswith("deep_tutor")
+
+
+def _resolve_deeptutor_ablation_flags(backend: str) -> dict[str, bool]:
+    """
+    Resolve ablation toggles for DeepTutor variants.
+
+    Returns dict:
+      - enable_rag
+      - enable_memory
+    """
+    if backend == "deep_tutor":
+        return {"enable_rag": True, "enable_memory": True}
+    if backend == "deep_tutor_no_rag":
+        return {"enable_rag": False, "enable_memory": True}
+    if backend == "deep_tutor_no_memory":
+        return {"enable_rag": True, "enable_memory": False}
+    if backend == "deep_tutor_no_rag_memory":
+        return {"enable_rag": False, "enable_memory": False}
+    raise ValueError(f"Unsupported DeepTutor backend variant: {backend}")
 
 
 def _suppress_noisy_auto_logs() -> None:
@@ -221,6 +260,8 @@ async def deep_tutor_respond(
     kb_name: str,
     workspace: str,
     language: str = "en",
+    enable_rag: bool = True,
+    enable_memory: bool = True,
 ) -> str:
     """
     Generate tutor response via DeepTutor solve pipeline.
@@ -233,13 +274,18 @@ async def deep_tutor_respond(
         return "(DeepTutor unavailable: missing kb_name in entry.)"
 
     question = _build_tutor_instruction(student_message) + student_message
+    enabled_tools = ["code_execute", "reason"]
+    if enable_rag:
+        enabled_tools.insert(0, "rag_search")
 
     result = await solve_question(
         workspace=workspace,
         kb_name=kb_name,
         question=question,
         language=language,
-        enabled_tools=["rag_search", "code_execute", "reason"],
+        enabled_tools=enabled_tools,
+        enable_memory=enable_memory,
+        enable_planner_retrieve=enable_rag,
     )
     answer = (result.get("answer") or "").strip()
     return answer or "(No answer generated.)"
@@ -265,6 +311,8 @@ async def deep_tutor_generate_practice_problem(
     workspace: str,
     topic: str,
     language: str = "en",
+    enable_rag: bool = True,
+    enable_memory: bool = True,
 ) -> str:
     """
     Generate one practice problem via DeepTutor question pipeline.
@@ -280,6 +328,8 @@ async def deep_tutor_generate_practice_problem(
         topic=topic,
         num_questions=1,
         language=language,
+        enable_memory=enable_memory,
+        enable_rag=enable_rag,
         enable_web=False,
     )
     questions = result.get("questions", []) or []
@@ -318,6 +368,8 @@ async def deep_tutor_generate_practice_questions(
     num_questions: int = PRACTICE_QUESTION_COUNT,
     max_retries: int = 2,
     tutor_history: list[dict[str, str]] | None = None,
+    enable_rag: bool = True,
+    enable_memory: bool = True,
 ) -> list[str]:
     """Generate multiple practice questions via DeepTutor question pipeline.
 
@@ -342,6 +394,8 @@ async def deep_tutor_generate_practice_questions(
             preferences=preferences,
             num_questions=remaining,
             language=language,
+            enable_memory=enable_memory,
+            enable_rag=enable_rag,
             enable_web=False,
         )
         questions = result.get("questions", []) or []
@@ -470,7 +524,7 @@ async def _run_single_session(
     max_turns: int,
     auto: bool,
     use_editor: bool,
-    auto_backend: Literal["deep_tutor", "mock"] = "deep_tutor",
+    auto_backend: AutoBackend = "deep_tutor",
     deeptutor_workspace: str | None = None,
     deeptutor_language: str = "en",
     prior_sessions_summary: str | None = None,
@@ -493,19 +547,31 @@ async def _run_single_session(
     task_title = entry.get("task", {}).get("title", "")
 
     tutor_history: list[dict[str, str]] = []
+    if auto and auto_backend not in SUPPORTED_AUTO_BACKENDS:
+        raise ValueError(
+            f"Unsupported auto_backend='{auto_backend}'. "
+            f"Supported: {SUPPORTED_AUTO_BACKENDS}"
+        )
     student_msg = agent.initial_message()
+    deep_flags = (
+        _resolve_deeptutor_ablation_flags(auto_backend)
+        if _is_deeptutor_backend(auto_backend)
+        else {}
+    )
 
     print(f"[Student] {student_msg}\n")
 
     for turn in range(1, max_turns):
         if auto:
             try:
-                if auto_backend == "deep_tutor":
+                if _is_deeptutor_backend(auto_backend):
                     tutor_msg = await deep_tutor_respond(
                         student_message=student_msg,
                         kb_name=kb_name,
                         workspace=workspace,
                         language=deeptutor_language,
+                        enable_rag=deep_flags.get("enable_rag", True),
+                        enable_memory=deep_flags.get("enable_memory", True),
                     )
                 else:
                     tutor_msg = await mock_tutor_respond(
@@ -560,7 +626,7 @@ async def _run_single_session(
         end_reason = "task_complete" if (student_action if "student_action" in dir() else None) == "task_complete" else "max_turns"
         print(f"[System] Session ended ({end_reason}). Generating practice questions...")
         try:
-            if auto_backend == "deep_tutor":
+            if _is_deeptutor_backend(auto_backend):
                 topic = (
                     f"{task_title}\n"
                     f"Conversation summary request: {TUTOR_POST_COMPLETE_PROMPT}\n"
@@ -572,6 +638,8 @@ async def _run_single_session(
                     topic=topic,
                     language=deeptutor_language,
                     tutor_history=tutor_history,
+                    enable_rag=deep_flags.get("enable_rag", True),
+                    enable_memory=deep_flags.get("enable_memory", True),
                 )
             else:
                 practice_questions = await mock_tutor_generate_practice_questions(
@@ -619,7 +687,7 @@ async def run_conversation(
     entry_path: str | Path,
     max_turns: int = 20,
     auto: bool = False,
-    auto_backend: Literal["deep_tutor", "mock"] = "deep_tutor",
+    auto_backend: AutoBackend = "deep_tutor",
     deeptutor_language: str = "en",
     output_dir: str | Path | None = None,
     entry_index: int = 0,
@@ -675,6 +743,16 @@ async def run_conversation(
 
     # Tutor-side history (from tutor's perspective)
     tutor_history: list[dict[str, str]] = []
+    if auto and auto_backend not in SUPPORTED_AUTO_BACKENDS:
+        raise ValueError(
+            f"Unsupported auto_backend='{auto_backend}'. "
+            f"Supported: {SUPPORTED_AUTO_BACKENDS}"
+        )
+    deep_flags = (
+        _resolve_deeptutor_ablation_flags(auto_backend)
+        if _is_deeptutor_backend(auto_backend)
+        else {}
+    )
 
     # Turn 0: Student's initial message
     student_msg = agent.initial_message()
@@ -684,12 +762,14 @@ async def run_conversation(
         # Get tutor response
         if auto:
             try:
-                if auto_backend == "deep_tutor":
+                if _is_deeptutor_backend(auto_backend):
                     tutor_msg = await deep_tutor_respond(
                         student_message=student_msg,
                         kb_name=kb_name,
                         workspace=workspace,
                         language=deeptutor_language,
+                        enable_rag=deep_flags.get("enable_rag", True),
+                        enable_memory=deep_flags.get("enable_memory", True),
                     )
                 else:
                     tutor_msg = await mock_tutor_respond(
@@ -749,7 +829,7 @@ async def run_conversation(
         end_reason = "task_complete" if (student_action if "student_action" in dir() else None) == "task_complete" else "max_turns"
         print(f"[System] Session ended ({end_reason}). Generating practice questions...")
         try:
-            if auto_backend == "deep_tutor":
+            if _is_deeptutor_backend(auto_backend):
                 topic = (
                     f"{task_title}\n"
                     f"Conversation summary request: {TUTOR_POST_COMPLETE_PROMPT}\n"
@@ -761,6 +841,8 @@ async def run_conversation(
                     topic=topic,
                     language=deeptutor_language,
                     tutor_history=tutor_history,
+                    enable_rag=deep_flags.get("enable_rag", True),
+                    enable_memory=deep_flags.get("enable_memory", True),
                 )
             else:
                 practice_questions = await mock_tutor_generate_practice_questions(
@@ -861,7 +943,7 @@ async def run_multi_session(
     entry_paths: list[str] | None = None,
     max_turns: int = 20,
     auto: bool = False,
-    auto_backend: Literal["deep_tutor", "mock"] = "deep_tutor",
+    auto_backend: AutoBackend = "deep_tutor",
     deeptutor_language: str = "en",
     output_dir: str | Path | None = None,
     use_editor: bool = True,
@@ -892,6 +974,12 @@ async def run_multi_session(
     else:
         raise ValueError("Provide either (entry_path + profile_id) or entry_paths")
 
+    if auto and auto_backend not in SUPPORTED_AUTO_BACKENDS:
+        raise ValueError(
+            f"Unsupported auto_backend='{auto_backend}'. "
+            f"Supported: {SUPPORTED_AUTO_BACKENDS}"
+        )
+
     if output_dir is None:
         output_dir = PROJECT_ROOT / "benchmark" / "data" / "transcripts"
     output_dir = Path(output_dir)
@@ -906,7 +994,7 @@ async def run_multi_session(
     print(f"\n{'='*60}")
     print(f"Multi-session: {profile_id_display} ({len(entries)} sessions)")
     print(f"Mode: {'auto (' + auto_backend + ')' if auto else 'interactive'}")
-    if auto and auto_backend == "deep_tutor":
+    if auto and _is_deeptutor_backend(auto_backend):
         print(f"DeepTutor workspace(shared): {shared_workspace}")
     print(f"Evolve profile: {evolve_profile}")
     print(f"{'='*60}\n")
@@ -1026,9 +1114,13 @@ async def main():
     )
     parser.add_argument(
         "--auto-backend",
-        choices=["deep_tutor", "mock"],
+        choices=SUPPORTED_AUTO_BACKENDS,
         default="deep_tutor",
-        help="Auto tutor backend (default: deep_tutor)",
+        help=(
+            "Auto tutor backend "
+            "(deep_tutor, deep_tutor_no_rag, deep_tutor_no_memory, "
+            "deep_tutor_no_rag_memory, mock)"
+        ),
     )
     parser.add_argument(
         "--deeptutor-language",

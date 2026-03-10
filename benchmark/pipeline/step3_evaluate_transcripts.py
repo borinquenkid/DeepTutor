@@ -215,7 +215,11 @@ async def main() -> None:
     parser.add_argument(
         "--backends",
         default="mock,deep_tutor",
-        help="Comma-separated backends to evaluate",
+        help=(
+            "Comma-separated backends to evaluate "
+            "(e.g., mock,deep_tutor,deep_tutor_no_rag,deep_tutor_no_memory,"
+            "deep_tutor_no_rag_memory)"
+        ),
     )
     parser.add_argument(
         "--concurrency",

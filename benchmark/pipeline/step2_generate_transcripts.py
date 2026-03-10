@@ -25,8 +25,6 @@ import os
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Literal
-
 _THIS_FILE = Path(__file__).resolve()
 PROJECT_ROOT = _THIS_FILE.parents[2]
 if str(PROJECT_ROOT) not in sys.path:
@@ -37,6 +35,13 @@ from benchmark.simulation.profile_evolver import evolve_profile as evolve_profil
 logger = logging.getLogger("benchmark.pipeline.step2")
 
 DEFAULT_OUTPUT_ROOT = PROJECT_ROOT / "benchmark" / "data" / "bench_pipeline"
+SUPPORTED_BACKENDS = {
+    "mock",
+    "deep_tutor",
+    "deep_tutor_no_rag",
+    "deep_tutor_no_memory",
+    "deep_tutor_no_rag_memory",
+}
 
 
 def _parse_names(raw: str) -> list[str]:
@@ -58,7 +63,7 @@ async def _simulate_profile_backend(
     kb_name: str,
     profile_id: str,
     entries: list[dict],
-    backend: Literal["deep_tutor", "mock"],
+    backend: str,
     output_root: Path,
     max_turns: int,
     language: str,
@@ -217,7 +222,7 @@ async def _process_profile(
                     kb_name=kb_name,
                     profile_id=profile_id,
                     entries=entries,
-                    backend=backend,  # type: ignore[arg-type]
+                    backend=backend,
                     output_root=output_root,
                     max_turns=max_turns,
                     language=language,
@@ -250,7 +255,11 @@ async def main() -> None:
     parser.add_argument(
         "--backends",
         default="mock,deep_tutor",
-        help="Comma-separated backends (executed serially per profile)",
+        help=(
+            "Comma-separated backends (serial per profile). "
+            "Supported: mock, deep_tutor, deep_tutor_no_rag, "
+            "deep_tutor_no_memory, deep_tutor_no_rag_memory"
+        ),
     )
     parser.add_argument("--concurrency", type=int, default=6, help="Max parallel profiles")
     parser.add_argument("--max-turns", type=int, default=30, help="Max student turns per session")
@@ -288,6 +297,12 @@ async def main() -> None:
 
     kb_names = _parse_names(args.kb_names)
     backends = _parse_names(args.backends)
+    invalid_backends = [b for b in backends if b not in SUPPORTED_BACKENDS]
+    if invalid_backends:
+        raise ValueError(
+            f"Unsupported backends: {invalid_backends}. "
+            f"Supported: {sorted(SUPPORTED_BACKENDS)}"
+        )
     output_root = Path(args.output_root)
     if not output_root.is_absolute():
         output_root = (PROJECT_ROOT / output_root).resolve()
