@@ -90,6 +90,9 @@ class ModelCatalogService:
         return catalog
 
     def _hydrate_missing_services_from_env(self, catalog: dict[str, Any]) -> bool:
+        from deeptutor.services.llm.factory import API_PROVIDER_PRESETS
+        from deeptutor.services.config.provider_runtime import EMBEDDING_PROVIDERS
+
         summary = get_env_store().as_summary()
         services = catalog.setdefault("services", {})
         changed = False
@@ -98,6 +101,17 @@ class ModelCatalogService:
         if not llm_service.get("profiles") and (summary.llm["model"] or summary.llm["host"]):
             profile_id = "llm-profile-default"
             model_id = "llm-model-default"
+            binding = summary.llm["binding"] or "openai"
+            
+            # Pick a default model if not set
+            model_name = summary.llm["model"]
+            if not model_name:
+                preset = API_PROVIDER_PRESETS.get(binding)
+                if preset and preset.get("models"):
+                    model_name = preset["models"][0]
+                else:
+                    model_name = "gpt-4o-mini" if binding == "openai" else "gemini-1.5-flash" if binding == "gemini" else ""
+
             services["llm"] = {
                 "active_profile_id": profile_id,
                 "active_model_id": model_id,
@@ -105,7 +119,7 @@ class ModelCatalogService:
                     {
                         "id": profile_id,
                         "name": "Default LLM Endpoint",
-                        "binding": summary.llm["binding"] or "openai",
+                        "binding": binding,
                         "base_url": summary.llm["host"],
                         "api_key": summary.llm["api_key"],
                         "api_version": summary.llm["api_version"],
@@ -113,8 +127,8 @@ class ModelCatalogService:
                         "models": [
                             {
                                 "id": model_id,
-                                "name": summary.llm["model"] or "Default Model",
-                                "model": summary.llm["model"],
+                                "name": model_name or "Default Model",
+                                "model": model_name,
                             }
                         ],
                     }
@@ -128,6 +142,21 @@ class ModelCatalogService:
         ):
             profile_id = "embedding-profile-default"
             model_id = "embedding-model-default"
+            binding = summary.embedding["binding"] or "openai"
+
+            # Pick default model and dimension
+            model_name = summary.embedding["model"]
+            dimension = summary.embedding["dimension"]
+            
+            emb_preset = EMBEDDING_PROVIDERS.get(binding)
+            if not model_name and emb_preset:
+                model_name = emb_preset.default_model
+            if not dimension and emb_preset:
+                dimension = str(emb_preset.default_dim)
+            
+            if not dimension:
+                dimension = "3072" if binding == "openai" else "768" if binding == "gemini" else "3072"
+
             services["embedding"] = {
                 "active_profile_id": profile_id,
                 "active_model_id": model_id,
@@ -135,7 +164,7 @@ class ModelCatalogService:
                     {
                         "id": profile_id,
                         "name": "Default Embedding Endpoint",
-                        "binding": summary.embedding["binding"] or "openai",
+                        "binding": binding,
                         "base_url": summary.embedding["host"],
                         "api_key": summary.embedding["api_key"],
                         "api_version": summary.embedding["api_version"],
@@ -143,9 +172,9 @@ class ModelCatalogService:
                         "models": [
                             {
                                 "id": model_id,
-                                "name": summary.embedding["model"] or "Default Embedding Model",
-                                "model": summary.embedding["model"],
-                                "dimension": summary.embedding["dimension"] or "3072",
+                                "name": model_name or "Default Embedding Model",
+                                "model": model_name,
+                                "dimension": dimension,
                             }
                         ],
                     }

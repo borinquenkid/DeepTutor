@@ -558,6 +558,12 @@ API_PROVIDER_PRESETS: dict[str, ApiProviderPreset] = {
         "requires_key": True,
         "models": [],
     },
+    "gemini": {
+        "name": "Gemini",
+        "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
+        "requires_key": True,
+        "models": ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash-exp"],
+    },
 }
 
 # Local Provider Presets
