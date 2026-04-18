@@ -1309,7 +1309,11 @@ function SettingsPageContent() {
                           let url = "";
                           let label = "";
 
-                          if (provider.includes("gemini") || binding.includes("gemini")) {
+                          // If provider is empty, we show Gemini by default as it's the most likely entry point
+                          if (!provider && !binding) {
+                            url = "https://aistudio.google.com/app/apikey";
+                            label = "Get Gemini Key";
+                          } else if (provider.includes("gemini") || binding.includes("gemini")) {
                             url = "https://aistudio.google.com/app/apikey";
                             label = t("Get Gemini Key");
                           } else if (provider.includes("openai") || binding.includes("openai")) {
