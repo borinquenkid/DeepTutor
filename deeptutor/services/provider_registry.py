@@ -37,6 +37,7 @@ class ProviderSpec:
     detect_by_key_prefix: str = ""
     detect_by_base_keyword: str = ""
     default_api_base: str = ""
+    default_model: str = ""
     strip_model_prefix: bool = False
     supports_max_completion_tokens: bool = False
     supports_prompt_caching: bool = False
@@ -194,6 +195,7 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         display_name="Anthropic",
         backend="anthropic",
         default_api_base="https://api.anthropic.com/v1",
+        default_model="claude-3-5-sonnet-latest",
         supports_prompt_caching=True,
     ),
     ProviderSpec(
@@ -203,6 +205,7 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         display_name="OpenAI",
         backend="openai_compat",
         default_api_base="https://api.openai.com/v1",
+        default_model="gpt-4o-mini",
         supports_max_completion_tokens=True,
     ),
     ProviderSpec(
@@ -213,6 +216,7 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         backend="openai_codex",
         is_oauth=True,
         default_api_base="https://chatgpt.com/backend-api",
+        default_model="gpt-4o",
     ),
     ProviderSpec(
         name="github_copilot",
@@ -222,6 +226,7 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         backend="github_copilot",
         is_oauth=True,
         default_api_base="https://api.githubcopilot.com",
+        default_model="gpt-4o",
         strip_model_prefix=True,
     ),
     ProviderSpec(
@@ -231,6 +236,7 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         display_name="DeepSeek",
         backend="openai_compat",
         default_api_base="https://api.deepseek.com",
+        default_model="deepseek-chat",
     ),
     ProviderSpec(
         name="gemini",
@@ -239,6 +245,7 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         display_name="Gemini",
         backend="openai_compat",
         default_api_base="https://generativelanguage.googleapis.com/v1beta/openai/",
+        default_model="gemini-1.5-flash",
     ),
     ProviderSpec(
         name="zhipu",
@@ -248,6 +255,7 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         backend="openai_compat",
         env_extras=(("ZHIPUAI_API_KEY", "{api_key}"),),
         default_api_base="https://open.bigmodel.cn/api/paas/v4",
+        default_model="glm-4-flash",
     ),
     ProviderSpec(
         name="dashscope",
@@ -256,6 +264,7 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         display_name="DashScope",
         backend="openai_compat",
         default_api_base="https://dashscope.aliyuncs.com/compatible-mode/v1",
+        default_model="qwen-max",
     ),
     ProviderSpec(
         name="moonshot",
@@ -264,6 +273,7 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         display_name="Moonshot",
         backend="openai_compat",
         default_api_base="https://api.moonshot.ai/v1",
+        default_model="moonshot-v1-8k",
         model_overrides=(("kimi-k2.5", {"temperature": 1.0}),),
     ),
     ProviderSpec(
@@ -273,6 +283,7 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         display_name="MiniMax",
         backend="openai_compat",
         default_api_base="https://api.minimax.io/v1",
+        default_model="abab6.5s-chat",
     ),
     ProviderSpec(
         name="mistral",
@@ -281,6 +292,7 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         display_name="Mistral",
         backend="openai_compat",
         default_api_base="https://api.mistral.ai/v1",
+        default_model="mistral-large-latest",
     ),
     ProviderSpec(
         name="stepfun",
@@ -289,6 +301,7 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         display_name="Step Fun",
         backend="openai_compat",
         default_api_base="https://api.stepfun.com/v1",
+        default_model="step-1-8k",
     ),
     ProviderSpec(
         name="xiaomi_mimo",
@@ -297,6 +310,7 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         display_name="Xiaomi MIMO",
         backend="openai_compat",
         default_api_base="https://api.xiaomimimo.com/v1",
+        default_model="mimo-pro",
     ),
     # === Local deployment ==================================================
     ProviderSpec(
@@ -317,6 +331,7 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         is_local=True,
         detect_by_base_keyword="11434",
         default_api_base="http://localhost:11434/v1",
+        default_model="llama3.2",
     ),
     ProviderSpec(
         name="lm_studio",
@@ -356,6 +371,7 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         display_name="Groq",
         backend="openai_compat",
         default_api_base="https://api.groq.com/openai/v1",
+        default_model="llama-3.3-70b-versatile",
     ),
     ProviderSpec(
         name="qianfan",
@@ -364,6 +380,7 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         display_name="Qianfan",
         backend="openai_compat",
         default_api_base="https://qianfan.baidubce.com/v2",
+        default_model="ernie-4.0-8k",
     ),
 )
 

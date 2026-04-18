@@ -90,8 +90,8 @@ class ModelCatalogService:
         return catalog
 
     def _hydrate_missing_services_from_env(self, catalog: dict[str, Any]) -> bool:
-        from deeptutor.services.llm.factory import API_PROVIDER_PRESETS
         from deeptutor.services.config.provider_runtime import EMBEDDING_PROVIDERS
+        from deeptutor.services.provider_registry import find_by_name
 
         summary = get_env_store().as_summary()
         services = catalog.setdefault("services", {})
@@ -103,14 +103,15 @@ class ModelCatalogService:
             model_id = "llm-model-default"
             binding = summary.llm["binding"] or "openai"
             
-            # Pick a default model if not set
+            # Resolve default model from registry
             model_name = summary.llm["model"]
             if not model_name:
-                preset = API_PROVIDER_PRESETS.get(binding)
-                if preset and preset.get("models"):
-                    model_name = preset["models"][0]
+                spec = find_by_name(binding)
+                if spec and spec.default_model:
+                    model_name = spec.default_model
                 else:
-                    model_name = "gpt-4o-mini" if binding == "openai" else "gemini-1.5-flash" if binding == "gemini" else ""
+                    # Fallback to gpt-4o-mini if registry is silent
+                    model_name = "gpt-4o-mini"
 
             services["llm"] = {
                 "active_profile_id": profile_id,
@@ -127,7 +128,7 @@ class ModelCatalogService:
                         "models": [
                             {
                                 "id": model_id,
-                                "name": model_name or "Default Model",
+                                "name": model_name,
                                 "model": model_name,
                             }
                         ],
@@ -144,18 +145,21 @@ class ModelCatalogService:
             model_id = "embedding-model-default"
             binding = summary.embedding["binding"] or "openai"
 
-            # Pick default model and dimension
+            # Pick default model and dimension from registry
             model_name = summary.embedding["model"]
             dimension = summary.embedding["dimension"]
             
             emb_preset = EMBEDDING_PROVIDERS.get(binding)
             if not model_name and emb_preset:
                 model_name = emb_preset.default_model
-            if not dimension and emb_preset:
-                dimension = str(emb_preset.default_dim)
             
-            if not dimension:
-                dimension = "3072" if binding == "openai" else "768" if binding == "gemini" else "3072"
+            # Favor preset dimension if explicitly defined, otherwise respect EnvStore's 3072
+            # only if the binding is actually openai.
+            if not dimension or (dimension == "3072" and binding != "openai"):
+                if emb_preset and emb_preset.default_dim:
+                    dimension = str(emb_preset.default_dim)
+                else:
+                    dimension = "3072"
 
             services["embedding"] = {
                 "active_profile_id": profile_id,
