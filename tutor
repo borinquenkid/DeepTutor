@@ -96,7 +96,31 @@ find_python() {
 PYTHON_CMD=$(find_python)
 
 if [ -z "$PYTHON_CMD" ]; then
-    log_error "DeepTutor requires Python ${MIN_PYTHON}+."
+    log_warn "Python ${MIN_PYTHON}+ not found."
+    
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        if command -v brew >/dev/null 2>&1; then
+            log_info "Attempting to install Python 3.11 via Homebrew..."
+            brew install python@3.11
+            PYTHON_CMD=$(find_python)
+        else
+            log_error "Homebrew not found. Please install Python 3.11 manually from https://python.org"
+            exit 1
+        fi
+    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        if command -v apt-get >/dev/null 2>&1; then
+            log_info "Attempting to install Python 3.11 via apt-get..."
+            sudo apt-get update && sudo apt-get install -y python3.11 python3.11-venv
+            PYTHON_CMD=$(find_python)
+        else
+            log_error "Supported package manager not found. Please install Python 3.11 manually."
+            exit 1
+        fi
+    fi
+fi
+
+if [ -z "$PYTHON_CMD" ]; then
+    log_error "Failed to automatically install Python ${MIN_PYTHON}+."
     log_info "Please install it from https://python.org or your package manager."
     exit 1
 fi

@@ -69,7 +69,33 @@ foreach ($cmd in @("python", "python3", "py")) {
 }
 
 if ($null -eq $PYTHON_CMD) {
-    Log-Error "DeepTutor requires Python $MIN_PYTHON+."
+    Log-Warn "Python $MIN_PYTHON+ not found."
+    Log-Info "Attempting to install Python 3.11 via winget..."
+    
+    if (Get-Command winget -ErrorAction SilentlyContinue) {
+        & winget install --id Python.Python.3.11 -e --source winget --silent
+        
+        # Refresh session PATH
+        $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
+        
+        # Re-check
+        foreach ($cmd in @("python", "python3", "py")) {
+            try {
+                $ver = & $cmd -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>$null
+                if ($null -ne $ver -and [version]$ver -ge [version]$MIN_PYTHON) {
+                    $PYTHON_CMD = $cmd
+                    break
+                }
+            } catch {}
+        }
+    } else {
+        Log-Error "winget not found. Please install Python 3.11 manually from https://python.org"
+        exit 1
+    }
+}
+
+if ($null -eq $PYTHON_CMD) {
+    Log-Error "Failed to automatically install Python $MIN_PYTHON+."
     Log-Info "Please install it from https://python.org"
     exit 1
 }
