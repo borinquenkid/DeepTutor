@@ -419,6 +419,16 @@ def _install_commands(
 
 
 def _run_cmd(cmd: list[str], cwd: Path) -> None:
+    # Handle Apple Silicon Macs running under Rosetta 2
+    # If we are on Darwin ARM but running as x86_64, and the command is 'brew',
+    # we should prefix it with 'arch -arm64' to avoid architecture mismatch errors.
+    if platform.system() == "Darwin" and cmd[0] == "brew":
+        # Check if we are on ARM but in an x86_64 process
+        is_arm = subprocess.run(["sysctl", "-n", "hw.optional.arm64"], capture_output=True, text=True).stdout.strip() == "1"
+        is_x86_process = platform.machine() == "x86_64"
+        if is_arm and is_x86_process:
+            cmd = ["arch", "-arm64"] + cmd
+
     log_info(f"{dim(str(cwd))}  {' '.join(cmd)}")
     # On Windows, use shell=True to handle .cmd files properly
     use_shell = platform.system().lower() == "windows"
