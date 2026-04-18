@@ -135,9 +135,31 @@ if (-not (Test-Path ".env")) {
     }
 }
 
+# 4. Interactive Configuration
+# If .env doesn't exist, or has empty config, or the tour hasn't been finalized, trigger setup
+$trigger_setup = $false
+if (-not (Test-Path ".env")) {
+    $trigger_setup = $true
+} else {
+    $env_content = Get-Content ".env"
+    if (-not ($env_content | Select-String -Pattern "LLM_API_KEY=.+") -or -not (Test-Path "data/settings/model_catalog.json")) {
+        $trigger_setup = $true
+    }
+}
+
+if ($args -contains "--setup") { $trigger_setup = $true }
+
 if ($trigger_setup) {
     Write-Host "`n🔑 DeepTutor Setup" -ForegroundColor White -Style Bold
     
+    # If we already have a .env, offer to just start
+    if (Test-Path ".env") {
+        $env_content = Get-Content ".env"
+        if ($env_content | Select-String -Pattern "LLM_API_KEY=.+") {
+            Write-Host "  0) Start DeepTutor Now (Use existing config)" -ForegroundColor Green -Style Bold
+        }
+    }
+
     # ── PHASE 1: THE BRAIN ───────────────────────────────────────────
     Write-Host "`nStep 1: Configure The Brain (LLM)" -ForegroundColor White -Style Bold
     Write-Host "Choose your AI provider for reasoning and chat:"
@@ -146,129 +168,127 @@ if ($trigger_setup) {
     Write-Host "  3) Anthropic" -ForegroundColor Yellow
     Write-Host "  4) DeepSeek"
     Write-Host "  5) Groq"
-    Write-Host "  6) Ollama (Local)`n"
+    Write-Host "  6) Ollama (Local)"
+    Write-Host "  s) Skip / Continue to Server`n"
     
     $b_choice = Read-Host "Selection"
     
-    $b_binding = ""; $b_host = ""; $b_key_url = ""; $b_env = ""
+    if ($b_choice -eq "0") {
+        Write-Host "Starting DeepTutor..."
+    } else {
+        $b_binding = ""; $b_host = ""; $b_key_url = ""; $b_env = ""
 
-    switch ($b_choice) {
-        "1" { $b_binding = "gemini"; $b_host = "https://generativelanguage.googleapis.com/v1beta/openai/"; $b_key_url = "https://aistudio.google.com/app/apikey"; $b_env = "GEMINI_API_KEY" }
-        "2" { $b_binding = "openai"; $b_host = "https://api.openai.com/v1"; $b_key_url = "https://platform.openai.com/api-keys"; $b_env = "OPENAI_API_KEY" }
-        "3" { $b_binding = "anthropic"; $b_host = "https://api.anthropic.com/v1"; $b_key_url = "https://console.anthropic.com/settings/keys"; $b_env = "ANTHROPIC_API_KEY" }
-        "4" { $b_binding = "deepseek"; $b_host = "https://api.deepseek.com"; $b_key_url = "https://platform.deepseek.com/api_keys"; $b_env = "DEEPSEEK_API_KEY" }
-        "5" { $b_binding = "groq"; $b_host = "https://api.groq.com/openai/v1"; $b_key_url = "https://console.groq.com/keys"; $b_env = "GROQ_API_KEY" }
-        "6" { $b_binding = "ollama"; $b_host = "http://localhost:11434/v1"; $b_env = "" }
-        Default { Write-Host "Skipping Brain setup..." }
-    }
+        switch ($b_choice) {
+            "1" { $b_binding = "gemini"; $b_host = "https://generativelanguage.googleapis.com/v1beta/openai/"; $b_key_url = "https://aistudio.google.com/app/apikey"; $b_env = "GEMINI_API_KEY" }
+            "2" { $b_binding = "openai"; $b_host = "https://api.openai.com/v1"; $b_key_url = "https://platform.openai.com/api-keys"; $b_env = "OPENAI_API_KEY" }
+            "3" { $b_binding = "anthropic"; $b_host = "https://api.anthropic.com/v1"; $b_key_url = "https://console.anthropic.com/settings/keys"; $b_env = "ANTHROPIC_API_KEY" }
+            "4" { $b_binding = "deepseek"; $b_host = "https://api.deepseek.com"; $b_key_url = "https://platform.deepseek.com/api_keys"; $b_env = "DEEPSEEK_API_KEY" }
+            "5" { $b_binding = "groq"; $b_host = "https://api.groq.com/openai/v1"; $b_key_url = "https://console.groq.com/keys"; $b_env = "GROQ_API_KEY" }
+            "6" { $b_binding = "ollama"; $b_host = "http://localhost:11434/v1"; $b_env = "" }
+            Default { Write-Host "Skipping configuration..." }
+        }
 
-    if ($b_binding -ne "") {
-        $b_key = "ollama"
-        if ($b_binding -ne "ollama") {
-            Write-Host "Get your key at: $b_key_url" -ForegroundColor Blue
-            $b_key = Read-Host "Paste your Brain API Key"
+        if ($b_binding -ne "") {
+            $b_key = "ollama"
+            if ($b_binding -ne "ollama") {
+                Write-Host "Get your key at: $b_key_url" -ForegroundColor Blue
+                $b_key = Read-Host "Paste your Brain API Key"
+            }
+
+            # ── PHASE 2: THE LIBRARIAN ───────────────────────────────────────
+            Write-Host "`nStep 2: Configure The Librarian (Embedding)" -ForegroundColor White -Style Bold
+            Write-Host "Choose your AI provider for reading documents:"
+            Write-Host "  1) Same as The Brain" -Style Bold
+            Write-Host "  2) Gemini"
+            Write-Host "  3) OpenAI"
+            Write-Host "  4) Cohere"
+            Write-Host "  5) Ollama (Local)`n"
+            
+            $l_choice = Read-Host "Selection"
+            $default_dim = if ($b_binding -eq "gemini") { "768" } else { "3072" }
+
+            $l_binding = ""; $l_host = ""; $l_key = ""; $l_dim = ""
+
+            switch ($l_choice) {
+                "1" { $l_binding = $b_binding; $l_host = $b_host; $l_key = $b_key; $l_dim = $default_dim }
+                "2" { $l_binding = "gemini"; $l_host = "https://generativelanguage.googleapis.com/v1beta/openai/"; $l_dim = "768" }
+                "3" { $l_binding = "openai"; $l_host = "https://api.openai.com/v1"; $l_dim = "3072" }
+                "4" { $l_binding = "cohere"; $l_host = "https://api.cohere.ai"; $l_dim = "1024" }
+                "5" { $l_binding = "ollama"; $l_host = "http://localhost:11434"; $l_dim = "768"; $l_key = "ollama" }
+                Default { Write-Host "Skipping Librarian setup..." }
+            }
+
+            if ($l_binding -ne "" -and $l_choice -ne "1" -and $l_binding -ne "ollama") {
+                $l_key = Read-Host "Paste your Librarian API Key"
+            }
+
+            # ── PHASE 3: THE EXPLORER ────────────────────────────────────────
+            Write-Host "`nStep 3: Configure The Explorer (Web Search)" -ForegroundColor White -Style Bold
+            Write-Host "Optional: choose a web search provider:"
+            Write-Host "  1) Brave Search" -ForegroundColor Blue
+            Write-Host "  2) Tavily" -ForegroundColor Yellow
+            Write-Host "  3) Perplexity"
+            Write-Host "  s) Skip`n"
+            
+            $e_choice = Read-Host "Selection"
+            $e_prov = ""; $e_url = ""; $e_key = ""
+
+            switch ($e_choice) {
+                "1" { $e_prov = "brave"; $e_url = "https://api.search.brave.com/app/dashboard" }
+                "2" { $e_prov = "tavily"; $e_url = "https://tavily.com/dashboard" }
+                "3" { $e_prov = "perplexity"; $e_url = "https://www.perplexity.ai/settings/api" }
+            }
+
+            if ($e_prov -ne "") {
+                Write-Host "Get your key at: $e_url" -ForegroundColor Blue
+                $e_key = Read-Host "Paste your Explorer API Key"
+            }
+
+            # ── SAVE TO .ENV ────────────────────────────────────────────────
+            if (-not (Test-Path ".env")) { New-Item -Path ".env" -ItemType File }
+            $clean_pattern = "^(LLM_|EMBEDDING_|SEARCH_|GEMINI_API_KEY|OPENAI_API_KEY|ANTHROPIC_API_KEY|DEEPSEEK_API_KEY|GROQ_API_KEY|MISTRAL_API_KEY|COHERE_API_KEY|BRAVE_API_KEY|TAVILY_API_KEY|PERPLEXITY_API_KEY|GOOGLE_API_KEY)="
+            $temp_env = Get-Content ".env" | Where-Object { $_ -notmatch $clean_pattern }
+            $temp_env | Set-Content ".env"
+
+            if ($b_binding -ne "") {
+                Add-Content -Path ".env" -Value "LLM_BINDING=$b_binding"
+                Add-Content -Path ".env" -Value "LLM_HOST=$b_host"
+                Add-Content -Path ".env" -Value "LLM_API_KEY=$b_key"
+                if ($b_env -ne "") { Add-Content -Path ".env" -Value "$b_env=$b_key" }
+            }
+            if ($l_binding -ne "") {
+                Add-Content -Path ".env" -Value "EMBEDDING_BINDING=$l_binding"
+                Add-Content -Path ".env" -Value "EMBEDDING_HOST=$l_host"
+                Add-Content -Path ".env" -Value "EMBEDDING_API_KEY=$l_key"
+                Add-Content -Path ".env" -Value "EMBEDDING_DIMENSION=$l_dim"
+
+                $l_env_key = switch ($l_binding) {
+                    "gemini" { "GEMINI_API_KEY" }
+                    "openai" { "OPENAI_API_KEY" }
+                    "cohere" { "COHERE_API_KEY" }
+                    Default { "" }
+                }
+                if ($l_env_key -ne "" -and $l_env_key -ne $b_env) {
+                    Add-Content -Path ".env" -Value "$l_env_key=$l_key"
+                }
+            }
+            if ($e_prov -ne "") {
+                Add-Content -Path ".env" -Value "SEARCH_PROVIDER=$e_prov"
+                Add-Content -Path ".env" -Value "SEARCH_API_KEY=$e_key"
+                $e_env_key = switch ($e_prov) {
+                    "brave" { "BRAVE_API_KEY" }
+                    "tavily" { "TAVILY_API_KEY" }
+                    "perplexity" { "PERPLEXITY_API_KEY" }
+                    Default { "" }
+                }
+                if ($e_env_key -ne "") {
+                    Add-Content -Path ".env" -Value "$e_env_key=$e_key"
+                }
+            }
+
+            Log-Success "Configuration saved to .env"
         }
     }
-
-    # ── PHASE 2: THE LIBRARIAN ───────────────────────────────────────
-    Write-Host "`nStep 2: Configure The Librarian (Embedding)" -ForegroundColor White -Style Bold
-    Write-Host "Choose your AI provider for reading documents:"
-    Write-Host "  1) Same as The Brain" -Style Bold
-    Write-Host "  2) Gemini"
-    Write-Host "  3) OpenAI"
-    Write-Host "  4) Cohere"
-    Write-Host "  5) Ollama (Local)`n"
-    
-    $l_choice = Read-Host "Selection"
-    $default_dim = if ($b_binding -eq "gemini") { "768" } else { "3072" }
-
-    $l_binding = ""; $l_host = ""; $l_key = ""; $l_dim = ""
-
-    switch ($l_choice) {
-        "1" { $l_binding = $b_binding; $l_host = $b_host; $l_key = $b_key; $l_dim = $default_dim }
-        "2" { $l_binding = "gemini"; $l_host = "https://generativelanguage.googleapis.com/v1beta/openai/"; $l_dim = "768" }
-        "3" { $l_binding = "openai"; $l_host = "https://api.openai.com/v1"; $l_dim = "3072" }
-        "4" { $l_binding = "cohere"; $l_host = "https://api.cohere.ai"; $l_dim = "1024" }
-        "5" { $l_binding = "ollama"; $l_host = "http://localhost:11434"; $l_dim = "768"; $l_key = "ollama" }
-        Default { Write-Host "Skipping Librarian setup..." }
-    }
-
-    if ($l_binding -ne "" -and $l_choice -ne "1" -and $l_binding -ne "ollama") {
-        $l_key = Read-Host "Paste your Librarian API Key"
-    }
-
-    # ── PHASE 3: THE EXPLORER ────────────────────────────────────────
-    Write-Host "`nStep 3: Configure The Explorer (Web Search)" -ForegroundColor White -Style Bold
-    Write-Host "Optional: choose a web search provider:"
-    Write-Host "  1) Brave Search" -ForegroundColor Blue
-    Write-Host "  2) Tavily" -ForegroundColor Yellow
-    Write-Host "  3) Perplexity"
-    Write-Host "  s) Skip`n"
-    
-    $e_choice = Read-Host "Selection"
-    $e_prov = ""; $e_url = ""; $e_key = ""
-
-    switch ($e_choice) {
-        "1" { $e_prov = "brave"; $e_url = "https://api.search.brave.com/app/dashboard" }
-        "2" { $e_prov = "tavily"; $e_url = "https://tavily.com/dashboard" }
-        "3" { $e_prov = "perplexity"; $e_url = "https://www.perplexity.ai/settings/api" }
-    }
-
-    if ($e_prov -ne "") {
-        Write-Host "Get your key at: $e_url" -ForegroundColor Blue
-        $e_key = Read-Host "Paste your Explorer API Key"
-    }
-
-    # ── SAVE TO .ENV ────────────────────────────────────────────────
-    if (-not (Test-Path ".env")) { New-Item -Path ".env" -ItemType File }
-    
-    # Comprehensive cleanup: remove generic vars AND all known specific provider keys
-    $clean_pattern = "^(LLM_|EMBEDDING_|SEARCH_|GEMINI_API_KEY|OPENAI_API_KEY|ANTHROPIC_API_KEY|DEEPSEEK_API_KEY|GROQ_API_KEY|MISTRAL_API_KEY|COHERE_API_KEY|BRAVE_API_KEY|TAVILY_API_KEY|PERPLEXITY_API_KEY|GOOGLE_API_KEY)="
-    $temp_env = Get-Content ".env" | Where-Object { $_ -notmatch $clean_pattern }
-    $temp_env | Set-Content ".env"
-
-    # Step 1: The Brain
-    if ($b_binding -ne "") {
-        Add-Content -Path ".env" -Value "LLM_BINDING=$b_binding"
-        Add-Content -Path ".env" -Value "LLM_HOST=$b_host"
-        Add-Content -Path ".env" -Value "LLM_API_KEY=$b_key"
-        if ($b_env -ne "") { Add-Content -Path ".env" -Value "$b_env=$b_key" }
-    }
-
-    # Step 2: The Librarian
-    if ($l_binding -ne "") {
-        Add-Content -Path ".env" -Value "EMBEDDING_BINDING=$l_binding"
-        Add-Content -Path ".env" -Value "EMBEDDING_HOST=$l_host"
-        Add-Content -Path ".env" -Value "EMBEDDING_API_KEY=$l_key"
-        Add-Content -Path ".env" -Value "EMBEDDING_DIMENSION=$l_dim"
-        
-        $l_env_key = switch ($l_binding) {
-            "gemini" { "GEMINI_API_KEY" }
-            "openai" { "OPENAI_API_KEY" }
-            "cohere" { "COHERE_API_KEY" }
-            Default { "" }
-        }
-        if ($l_env_key -ne "" -and $l_env_key -ne $b_env) {
-            Add-Content -Path ".env" -Value "$l_env_key=$l_key"
-        }
-    }
-
-    # Step 3: The Explorer
-    if ($e_prov -ne "") {
-        Add-Content -Path ".env" -Value "SEARCH_PROVIDER=$e_prov"
-        Add-Content -Path ".env" -Value "SEARCH_API_KEY=$e_key"
-        $e_env_key = switch ($e_prov) {
-            "brave" { "BRAVE_API_KEY" }
-            "tavily" { "TAVILY_API_KEY" }
-            "perplexity" { "PERPLEXITY_API_KEY" }
-            Default { "" }
-        }
-        if ($e_env_key -ne "") {
-            Add-Content -Path ".env" -Value "$e_env_key=$e_key"
-        }
-    }
-
-    Log-Success "Configuration saved to .env (Legacy keys cleaned)"
     Write-Host ""
 }
 

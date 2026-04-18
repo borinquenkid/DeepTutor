@@ -153,19 +153,23 @@ else
 fi
 
 # 4. Interactive Configuration
-# If .env doesn't exist or has empty/missing LLM config, ask for it now to reduce friction
+# If .env doesn't exist, or has empty config, or the tour hasn't been finalized, trigger setup
 TRIGGER_SETUP=false
-if [ ! -f ".env" ]; then
-    TRIGGER_SETUP=true
-elif ! grep -q "LLM_API_KEY=." .env; then
-    # Matches LLM_API_KEY= followed by at least one character
-    # This triggers if key is missing or empty
+if [ ! -f ".env" ] || ! grep -q "LLM_API_KEY=." .env || [ ! -f "data/settings/model_catalog.json" ]; then
     TRIGGER_SETUP=true
 fi
+
+# Allow forcing setup with --setup flag
+if [ "$1" == "--setup" ]; then TRIGGER_SETUP=true; fi
 
 if [ "$TRIGGER_SETUP" = true ]; then
     echo -e "\n${BOLD}🔑 DeepTutor Setup${NC}"
     
+    # If we already have a .env, offer to just start
+    if [ -f ".env" ] && grep -q "LLM_API_KEY=." .env; then
+        echo -e "  0) ${GREEN}${BOLD}🚀 Start DeepTutor Now${NC} (Use existing config)"
+    fi
+
     # ── PHASE 1: THE BRAIN ───────────────────────────────────────────
     echo -e "\n${BOLD}Step 1: Configure The Brain (LLM)${NC}"
     echo -e "Choose your AI provider for reasoning and chat:"
@@ -175,129 +179,97 @@ if [ "$TRIGGER_SETUP" = true ]; then
     echo -e "  4) DeepSeek"
     echo -e "  5) Groq"
     echo -e "  6) Ollama (Local)"
+    echo -e "  s) Skip / Continue to Server\n"
     
     printf "${BOLD}Selection: ${NC}"
     read -r BRAIN_CHOICE
 
-    case $BRAIN_CHOICE in
-        1) B_BINDING="gemini"; B_HOST="https://generativelanguage.googleapis.com/v1beta/openai/"; B_KEY_URL="https://aistudio.google.com/app/apikey"; B_ENV="GEMINI_API_KEY" ;;
-        2) B_BINDING="openai"; B_HOST="https://api.openai.com/v1"; B_KEY_URL="https://platform.openai.com/api-keys"; B_ENV="OPENAI_API_KEY" ;;
-        3) B_BINDING="anthropic"; B_HOST="https://api.anthropic.com/v1"; B_KEY_URL="https://console.anthropic.com/settings/keys"; B_ENV="ANTHROPIC_API_KEY" ;;
-        4) B_BINDING="deepseek"; B_HOST="https://api.deepseek.com"; B_KEY_URL="https://platform.deepseek.com/api_keys"; B_ENV="DEEPSEEK_API_KEY" ;;
-        5) B_BINDING="groq"; B_HOST="https://api.groq.com/openai/v1"; B_KEY_URL="https://console.groq.com/keys"; B_ENV="GROQ_API_KEY" ;;
-        6) B_BINDING="ollama"; B_HOST="http://localhost:11434/v1"; B_ENV="" ;;
-        *) echo "Skipping Brain setup..."; B_BINDING="" ;;
-    esac
+    if [ "$BRAIN_CHOICE" == "0" ] && [ -f ".env" ]; then
+        echo "Starting DeepTutor..."
+    else
+        case $BRAIN_CHOICE in
+            1) B_BINDING="gemini"; B_HOST="https://generativelanguage.googleapis.com/v1beta/openai/"; B_KEY_URL="https://aistudio.google.com/app/apikey"; B_ENV="GEMINI_API_KEY" ;;
+            2) B_BINDING="openai"; B_HOST="https://api.openai.com/v1"; B_KEY_URL="https://platform.openai.com/api-keys"; B_ENV="OPENAI_API_KEY" ;;
+            3) B_BINDING="anthropic"; B_HOST="https://api.anthropic.com/v1"; B_KEY_URL="https://console.anthropic.com/settings/keys"; B_ENV="ANTHROPIC_API_KEY" ;;
+            4) B_BINDING="deepseek"; B_HOST="https://api.deepseek.com"; B_KEY_URL="https://platform.deepseek.com/api_keys"; B_ENV="DEEPSEEK_API_KEY" ;;
+            5) B_BINDING="groq"; B_HOST="https://api.groq.com/openai/v1"; B_KEY_URL="https://console.groq.com/keys"; B_ENV="GROQ_API_KEY" ;;
+            6) B_BINDING="ollama"; B_HOST="http://localhost:11434/v1"; B_ENV="" ;;
+            *) echo "Skipping configuration..."; B_BINDING="" ;;
+        esac
 
-    if [ -n "$B_BINDING" ]; then
-        B_KEY="ollama"
-        if [ "$B_BINDING" != "ollama" ]; then
-            echo -e "Get your key at: ${BLUE}$B_KEY_URL${NC}"
-            printf "${YELLOW}Paste your Brain API Key: ${NC}"
-            read -r B_KEY
+        if [ -n "$B_BINDING" ]; then
+            B_KEY="ollama"
+            if [ "$B_BINDING" != "ollama" ]; then
+                echo -e "Get your key at: ${BLUE}$B_KEY_URL${NC}"
+                printf "${YELLOW}Paste your Brain API Key: ${NC}"
+                read -r B_KEY
+            fi
+
+            # ── PHASE 2: THE LIBRARIAN ───────────────────────────────────────
+            echo -e "\n${BOLD}Step 2: Configure The Librarian (Embedding)${NC}"
+            echo -e "Choose your AI provider for reading documents:"
+            echo -e "  1) ${BOLD}Same as The Brain${NC}"
+            echo -e "  2) Gemini"
+            echo -e "  3) OpenAI"
+            echo -e "  4) Cohere"
+            echo -e "  5) Ollama (Local)"
+            
+            printf "${BOLD}Selection: ${NC}"
+            read -r LIB_CHOICE
+
+            case $BRAIN_CHOICE in 1) DEFAULT_DIM="768" ;; *) DEFAULT_DIM="3072" ;; esac
+
+            case $LIB_CHOICE in
+                1) L_BINDING=$B_BINDING; L_HOST=$B_HOST; L_KEY=$B_KEY; L_DIM=$DEFAULT_DIM ;;
+                2) L_BINDING="gemini"; L_HOST="https://generativelanguage.googleapis.com/v1beta/openai/"; L_DIM="768" ;;
+                3) L_BINDING="openai"; L_HOST="https://api.openai.com/v1"; L_DIM="3072" ;;
+                4) L_BINDING="cohere"; L_HOST="https://api.cohere.ai"; L_DIM="1024" ;;
+                5) L_BINDING="ollama"; L_HOST="http://localhost:11434"; L_DIM="768"; L_KEY="ollama" ;;
+                *) L_BINDING=""; echo "Skipping Librarian setup..." ;;
+            esac
+
+            if [ -n "$L_BINDING" ] && [ "$LIB_CHOICE" != "1" ] && [ "$L_BINDING" != "ollama" ]; then
+                printf "${YELLOW}Paste your Librarian API Key: ${NC}"
+                read -r L_KEY
+            fi
+
+            # ── PHASE 3: THE EXPLORER ────────────────────────────────────────
+            echo -e "\n${BOLD}Step 3: Configure The Explorer (Web Search)${NC}"
+            echo -e "Optional: choose a web search provider:"
+            echo -e "  1) ${BLUE}Brave Search${NC}"
+            echo -e "  2) ${YELLOW}Tavily${NC}"
+            echo -e "  3) Perplexity"
+            echo -e "  s) Skip\n"
+            
+            printf "${BOLD}Selection: ${NC}"
+            read -r EXP_CHOICE
+
+            case $EXP_CHOICE in
+                1) E_PROV="brave"; E_URL="https://api.search.brave.com/app/dashboard" ;;
+                2) E_PROV="tavily"; E_URL="https://tavily.com/dashboard" ;;
+                3) E_PROV="perplexity"; E_URL="https://www.perplexity.ai/settings/api" ;;
+                *) E_PROV="" ;;
+            esac
+
+            if [ -n "$E_PROV" ]; then
+                echo -e "Get your key at: ${BLUE}$E_URL${NC}"
+                printf "${YELLOW}Paste your Explorer API Key: ${NC}"
+                read -r E_KEY
+            fi
+
+            # ── SAVE TO .ENV ────────────────────────────────────────────────
+            [ ! -f ".env" ] && touch .env
+            CLEAN_PATTERN="^(LLM_|EMBEDDING_|SEARCH_|GEMINI_API_KEY|OPENAI_API_KEY|ANTHROPIC_API_KEY|DEEPSEEK_API_KEY|GROQ_API_KEY|MISTRAL_API_KEY|COHERE_API_KEY|BRAVE_API_KEY|TAVILY_API_KEY|PERPLEXITY_API_KEY|GOOGLE_API_KEY)="
+            grep -vE "$CLEAN_PATTERN" .env > .env.tmp || true
+            mv .env.tmp .env
+
+            [ -n "$B_BINDING" ] && { echo "LLM_BINDING=$B_BINDING" >> .env; echo "LLM_HOST=$B_HOST" >> .env; echo "LLM_API_KEY=$B_KEY" >> .env; [ -n "$B_ENV" ] && echo "$B_ENV=$B_KEY" >> .env; }
+            [ -n "$L_BINDING" ] && { echo "EMBEDDING_BINDING=$L_BINDING" >> .env; echo "EMBEDDING_HOST=$L_HOST" >> .env; echo "EMBEDDING_API_KEY=$L_KEY" >> .env; echo "EMBEDDING_DIMENSION=$L_DIM" >> .env; }
+            [ -n "$E_PROV" ] && { echo "SEARCH_PROVIDER=$E_PROV" >> .env; echo "SEARCH_API_KEY=$E_KEY" >> .env; }
+
+            log_success "Configuration saved to .env"
         fi
     fi
-
-    # ── PHASE 2: THE LIBRARIAN ───────────────────────────────────────
-    echo -e "\n${BOLD}Step 2: Configure The Librarian (Embedding)${NC}"
-    echo -e "Choose your AI provider for reading documents:"
-    echo -e "  1) ${BOLD}Same as The Brain${NC}"
-    echo -e "  2) Gemini"
-    echo -e "  3) OpenAI"
-    echo -e "  4) Cohere"
-    echo -e "  5) Ollama (Local)"
-    
-    printf "${BOLD}Selection: ${NC}"
-    read -r LIB_CHOICE
-
-    case $BRAIN_CHOICE in 1) DEFAULT_DIM="768" ;; *) DEFAULT_DIM="3072" ;; esac
-
-    case $LIB_CHOICE in
-        1) L_BINDING=$B_BINDING; L_HOST=$B_HOST; L_KEY=$B_KEY; L_DIM=$DEFAULT_DIM ;;
-        2) L_BINDING="gemini"; L_HOST="https://generativelanguage.googleapis.com/v1beta/openai/"; L_DIM="768" ;;
-        3) L_BINDING="openai"; L_HOST="https://api.openai.com/v1"; L_DIM="3072" ;;
-        4) L_BINDING="cohere"; L_HOST="https://api.cohere.ai"; L_DIM="1024" ;;
-        5) L_BINDING="ollama"; L_HOST="http://localhost:11434"; L_DIM="768"; L_KEY="ollama" ;;
-        *) L_BINDING=""; echo "Skipping Librarian setup..." ;;
-    esac
-
-    if [ -n "$L_BINDING" ] && [ "$LIB_CHOICE" != "1" ] && [ "$L_BINDING" != "ollama" ]; then
-        printf "${YELLOW}Paste your Librarian API Key: ${NC}"
-        read -r L_KEY
-    fi
-
-    # ── PHASE 3: THE EXPLORER ────────────────────────────────────────
-    echo -e "\n${BOLD}Step 3: Configure The Explorer (Web Search)${NC}"
-    echo -e "Optional: choose a web search provider:"
-    echo -e "  1) ${BLUE}Brave Search${NC}"
-    echo -e "  2) ${YELLOW}Tavily${NC}"
-    echo -e "  3) Perplexity"
-    echo -e "  s) Skip\n"
-    
-    printf "${BOLD}Selection: ${NC}"
-    read -r EXP_CHOICE
-
-    case $EXP_CHOICE in
-        1) E_PROV="brave"; E_URL="https://api.search.brave.com/app/dashboard" ;;
-        2) E_PROV="tavily"; E_URL="https://tavily.com/dashboard" ;;
-        3) E_PROV="perplexity"; E_URL="https://www.perplexity.ai/settings/api" ;;
-        *) E_PROV="" ;;
-    esac
-
-    if [ -n "$E_PROV" ]; then
-        echo -e "Get your key at: ${BLUE}$E_URL${NC}"
-        printf "${YELLOW}Paste your Explorer API Key: ${NC}"
-        read -r E_KEY
-    fi
-
-    # ── SAVE TO .ENV ────────────────────────────────────────────────
-    [ ! -f ".env" ] && touch .env
-    
-    # Comprehensive cleanup: remove generic vars AND all known specific provider keys
-    # to avoid "ghost" keys when switching providers.
-    CLEAN_PATTERN="^(LLM_|EMBEDDING_|SEARCH_|GEMINI_API_KEY|OPENAI_API_KEY|ANTHROPIC_API_KEY|DEEPSEEK_API_KEY|GROQ_API_KEY|MISTRAL_API_KEY|COHERE_API_KEY|BRAVE_API_KEY|TAVILY_API_KEY|PERPLEXITY_API_KEY|GOOGLE_API_KEY)="
-    grep -vE "$CLEAN_PATTERN" .env > .env.tmp || true
-    mv .env.tmp .env
-
-    # Step 1: The Brain
-    if [ -n "$B_BINDING" ]; then
-        echo "LLM_BINDING=$B_BINDING" >> .env
-        echo "LLM_HOST=$B_HOST" >> .env
-        echo "LLM_API_KEY=$B_KEY" >> .env
-        [ -n "$B_ENV" ] && echo "$B_ENV=$B_KEY" >> .env
-    fi
-
-    # Step 2: The Librarian
-    if [ -n "$L_BINDING" ]; then
-        echo "EMBEDDING_BINDING=$L_BINDING" >> .env
-        echo "EMBEDDING_HOST=$L_HOST" >> .env
-        echo "EMBEDDING_API_KEY=$L_KEY" >> .env
-        echo "EMBEDDING_DIMENSION=$L_DIM" >> .env
-        # If Librarian has a specific env key (like OPENAI_API_KEY), we should write it too
-        # but only if it's different from the Brain's provider to avoid duplicates.
-        case $L_BINDING in
-            gemini) L_ENV="GEMINI_API_KEY" ;;
-            openai) L_ENV="OPENAI_API_KEY" ;;
-            cohere) L_ENV="COHERE_API_KEY" ;;
-            *) L_ENV="" ;;
-        esac
-        [ -n "$L_ENV" ] && [ "$L_ENV" != "$B_ENV" ] && echo "$L_ENV=$L_KEY" >> .env
-    fi
-
-    # Step 3: The Explorer
-    if [ -n "$E_PROV" ]; then
-        echo "SEARCH_PROVIDER=$E_PROV" >> .env
-        echo "SEARCH_API_KEY=$E_KEY" >> .env
-        case $E_PROV in
-            brave) E_ENV="BRAVE_API_KEY" ;;
-            tavily) E_ENV="TAVILY_API_KEY" ;;
-            perplexity) E_ENV="PERPLEXITY_API_KEY" ;;
-            *) E_ENV="" ;;
-        esac
-        [ -n "$E_ENV" ] && echo "$E_ENV=$E_KEY" >> .env
-    fi
-
-    log_success "Configuration saved to .env (Legacy keys cleaned)"
     echo ""
 fi
 
