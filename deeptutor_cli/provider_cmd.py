@@ -12,7 +12,7 @@ def register(app: typer.Typer) -> None:
     def provider_login(
         provider: str = typer.Argument(
             ...,
-            help="Provider: openai-codex (OAuth login) | github-copilot (validate existing Copilot auth)",
+            help="Provider: gemini (Google OAuth) | openai-codex (OAuth login) | github-copilot (validate existing Copilot auth)",
         ),
     ) -> None:
         """Authenticate or validate provider access."""
@@ -20,12 +20,46 @@ def register(app: typer.Typer) -> None:
         if key == "openai_codex":
             _login_openai_codex()
             return
+        if key == "gemini":
+            _login_gemini()
+            return
         if key == "github_copilot":
             maybe_run(_login_github_copilot())
             return
         raise typer.BadParameter(
-            f"Unknown provider `{provider}`. Supported: openai-codex, github-copilot"
+            f"Unknown provider `{provider}`. Supported: gemini, openai-codex, github-copilot"
         )
+
+
+def _login_gemini() -> None:
+    try:
+        from oauth_cli_kit import get_token, login_oauth_interactive
+    except ImportError:
+        typer.echo(
+            "oauth_cli_kit is not installed. Install CLI deps: "
+            "pip install -r requirements/cli.txt"
+        )
+        raise typer.Exit(code=1)
+
+    # Gemini (Google) OAuth flow
+    token = None
+    try:
+        token = get_token(provider="google")
+    except Exception:
+        token = None
+    
+    if not (token and getattr(token, "access", None)):
+        token = login_oauth_interactive(
+            provider="google",
+            print_fn=typer.echo,
+            prompt_fn=typer.prompt,
+        )
+    
+    if not (token and getattr(token, "access", None)):
+        typer.echo("Gemini (Google) OAuth authentication failed.")
+        raise typer.Exit(code=1)
+    
+    typer.echo("Gemini (Google) OAuth authentication succeeded.")
 
 
 def _login_openai_codex() -> None:
