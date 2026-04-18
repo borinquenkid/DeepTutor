@@ -661,10 +661,11 @@ def _run_web_tour() -> None:
     step(1, total, "Install profile")
     profile = select(
         "Choose a dependency profile",
-        [
-            ("web-basic", "web-basic", "FastAPI + Next.js"),
-            ("web-rag", "web-rag", "+ LlamaIndex RAG"),
-        ],
+        options = [
+            ("web-basic", "Standard Chat", "Core App (Fastest) — AI conversation & web interface"),
+            ("web-rag", "Knowledge Hub", "Full Feature — Adds document support (PDF, TXT, RAG search)"),
+        ]
+
     )
     _save_cache({"step": 1, "mode": "web", "profile": profile, "status": "running"})
 
