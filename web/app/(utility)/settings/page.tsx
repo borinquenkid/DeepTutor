@@ -1316,8 +1316,70 @@ function SettingsPageContent() {
                       />
                     </div>
                     <div className="sm:col-span-2">
-                      <div className="mb-1.5 text-[12px] text-[var(--muted-foreground)]">
-                        {t("API Key")}
+                      <div className="mb-1.5 flex items-center justify-between text-[12px] text-[var(--muted-foreground)]">
+                        <span>{t("API Key")}</span>
+                        {(() => {
+                          const provider = activeProfile.provider?.toLowerCase() || "";
+                          const binding = activeProfile.binding?.toLowerCase() || "";
+                          let url = "";
+                          let label = "";
+
+                          if (provider.includes("gemini") || binding.includes("gemini")) {
+                            url = "https://aistudio.google.com/app/apikey";
+                            label = t("Get Gemini Key");
+                          } else if (provider.includes("openai") || binding.includes("openai")) {
+                            url = "https://platform.openai.com/api-keys";
+                            label = t("Get OpenAI Key");
+                          } else if (provider.includes("anthropic") || binding.includes("anthropic")) {
+                            url = "https://console.anthropic.com/settings/keys";
+                            label = t("Get Anthropic Key");
+                          } else if (provider.includes("groq") || binding.includes("groq")) {
+                            url = "https://console.groq.com/keys";
+                            label = t("Get Groq Key");
+                          } else if (provider.includes("openrouter")) {
+                            url = "https://openrouter.ai/keys";
+                            label = t("Get OpenRouter Key");
+                          } else if (provider.includes("deepseek")) {
+                            url = "https://platform.deepseek.com/api_keys";
+                            label = t("Get DeepSeek Key");
+                          } else if (provider.includes("mistral") || binding.includes("mistral")) {
+                            url = "https://console.mistral.ai/api-keys/";
+                            label = t("Get Mistral Key");
+                          } else if (provider.includes("fireworks") || binding.includes("fireworks")) {
+                            url = "https://fireworks.ai/account/api-keys";
+                            label = t("Get Fireworks Key");
+                          } else if (provider.includes("together") || binding.includes("together")) {
+                            url = "https://api.together.xyz/settings/api-keys";
+                            label = t("Get Together Key");
+                          } else if (provider.includes("nvidia") || binding.includes("nvidia")) {
+                            url = "https://build.nvidia.com/explore/discover";
+                            label = t("Get NVIDIA Key");
+                          } else if (provider.includes("cohere") || binding.includes("cohere")) {
+                            url = "https://dashboard.cohere.com/api-keys";
+                            label = t("Get Cohere Key");
+                          } else if (provider.includes("perplexity") || binding.includes("perplexity")) {
+                            url = "https://www.perplexity.ai/settings/api";
+                            label = t("Get Perplexity Key");
+                          } else if (provider.includes("brave")) {
+                            url = "https://api.search.brave.com/app/dashboard";
+                            label = t("Get Brave Key");
+                          } else if (provider.includes("tavily")) {
+                            url = "https://tavily.com/dashboard";
+                            label = t("Get Tavily Key");
+                          }
+
+                          return url ? (
+                            <a
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1 text-[var(--primary)] hover:underline"
+                            >
+                              {label}
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          ) : null;
+                        })()}
                       </div>
                       <div className="relative">
                         <input
