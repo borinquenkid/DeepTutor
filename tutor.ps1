@@ -223,5 +223,18 @@ if ($trigger_setup) {
     Write-Host ""
 }
 
-# 5. Launch the Setup Tour
+# 5. Clear Port Conflicts
+# Ensure ports 8001 and 3782 are free to avoid "Address already in use" crashes
+function Clear-Port($port) {
+    $pid = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -First 1
+    if ($null -ne $pid) {
+        Log-Warn "Port $port is in use by PID $pid. Clearing..."
+        Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue
+    }
+}
+
+Clear-Port 8001
+Clear-Port 3782
+
+# 6. Launch the Setup Tour
 & $PYTHON_EXE scripts\start_tour.py $args

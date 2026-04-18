@@ -259,6 +259,22 @@ if [ "$TRIGGER_SETUP" = true ]; then
     echo ""
 fi
 
-# 5. Launch the Setup Tour
+# 5. Clear Port Conflicts
+# Ensure ports 8001 and 3782 are free to avoid "Address already in use" crashes
+clear_port() {
+    local port=$1
+    if command -v lsof >/dev/null 2>&1; then
+        local pid=$(lsof -t -i :$port)
+        if [ -n "$pid" ]; then
+            log_warn "Port $port is in use by PID $pid. Clearing..."
+            kill -9 $pid 2>/dev/null || true
+        fi
+    fi
+}
+
+clear_port 8001
+clear_port 3782
+
+# 6. Launch the Setup Tour
 # We pass all arguments to the script
 "$PYTHON_EXE" scripts/start_tour.py "$@"
