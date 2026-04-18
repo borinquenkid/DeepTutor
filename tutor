@@ -252,14 +252,52 @@ if [ "$TRIGGER_SETUP" = true ]; then
 
     # ── SAVE TO .ENV ────────────────────────────────────────────────
     [ ! -f ".env" ] && touch .env
-    grep -vE "^(LLM_|EMBEDDING_|SEARCH_|$B_ENV)=" .env > .env.tmp || true
+    
+    # Comprehensive cleanup: remove generic vars AND all known specific provider keys
+    # to avoid "ghost" keys when switching providers.
+    CLEAN_PATTERN="^(LLM_|EMBEDDING_|SEARCH_|GEMINI_API_KEY|OPENAI_API_KEY|ANTHROPIC_API_KEY|DEEPSEEK_API_KEY|GROQ_API_KEY|MISTRAL_API_KEY|COHERE_API_KEY|BRAVE_API_KEY|TAVILY_API_KEY|PERPLEXITY_API_KEY|GOOGLE_API_KEY)="
+    grep -vE "$CLEAN_PATTERN" .env > .env.tmp || true
     mv .env.tmp .env
 
-    [ -n "$B_BINDING" ] && { echo "LLM_BINDING=$B_BINDING" >> .env; echo "LLM_HOST=$B_HOST" >> .env; echo "LLM_API_KEY=$B_KEY" >> .env; [ -n "$B_ENV" ] && echo "$B_ENV=$B_KEY" >> .env; }
-    [ -n "$L_BINDING" ] && { echo "EMBEDDING_BINDING=$L_BINDING" >> .env; echo "EMBEDDING_HOST=$L_HOST" >> .env; echo "EMBEDDING_API_KEY=$L_KEY" >> .env; echo "EMBEDDING_DIMENSION=$L_DIM" >> .env; }
-    [ -n "$E_PROV" ] && { echo "SEARCH_PROVIDER=$E_PROV" >> .env; echo "SEARCH_API_KEY=$E_KEY" >> .env; }
+    # Step 1: The Brain
+    if [ -n "$B_BINDING" ]; then
+        echo "LLM_BINDING=$B_BINDING" >> .env
+        echo "LLM_HOST=$B_HOST" >> .env
+        echo "LLM_API_KEY=$B_KEY" >> .env
+        [ -n "$B_ENV" ] && echo "$B_ENV=$B_KEY" >> .env
+    fi
 
-    log_success "Configuration saved to .env"
+    # Step 2: The Librarian
+    if [ -n "$L_BINDING" ]; then
+        echo "EMBEDDING_BINDING=$L_BINDING" >> .env
+        echo "EMBEDDING_HOST=$L_HOST" >> .env
+        echo "EMBEDDING_API_KEY=$L_KEY" >> .env
+        echo "EMBEDDING_DIMENSION=$L_DIM" >> .env
+        # If Librarian has a specific env key (like OPENAI_API_KEY), we should write it too
+        # but only if it's different from the Brain's provider to avoid duplicates.
+        case $L_BINDING in
+            gemini) L_ENV="GEMINI_API_KEY" ;;
+            openai) L_ENV="OPENAI_API_KEY" ;;
+            cohere) L_ENV="COHERE_API_KEY" ;;
+            *) L_ENV="" ;;
+        esac
+        [ -n "$L_ENV" ] && [ "$L_ENV" != "$B_ENV" ] && echo "$L_ENV=$L_KEY" >> .env
+    fi
+
+    # Step 3: The Explorer
+    if [ -n "$E_PROV" ]; then
+        echo "SEARCH_PROVIDER=$E_PROV" >> .env
+        echo "SEARCH_API_KEY=$E_KEY" >> .env
+        case $E_PROV in
+            brave) E_ENV="BRAVE_API_KEY" ;;
+            tavily) E_ENV="TAVILY_API_KEY" ;;
+            perplexity) E_ENV="PERPLEXITY_API_KEY" ;;
+            *) E_ENV="" ;;
+        esac
+        [ -n "$E_ENV" ] && echo "$E_ENV=$E_KEY" >> .env
+    fi
+
+    log_success "Configuration saved to .env (Legacy keys cleaned)"
     echo ""
 fi
 

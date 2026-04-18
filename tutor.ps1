@@ -221,27 +221,54 @@ if ($trigger_setup) {
 
     # ── SAVE TO .ENV ────────────────────────────────────────────────
     if (-not (Test-Path ".env")) { New-Item -Path ".env" -ItemType File }
-    $temp_env = Get-Content ".env" | Where-Object { $_ -notmatch "^(LLM_|EMBEDDING_|SEARCH_|$b_env)=" }
+    
+    # Comprehensive cleanup: remove generic vars AND all known specific provider keys
+    $clean_pattern = "^(LLM_|EMBEDDING_|SEARCH_|GEMINI_API_KEY|OPENAI_API_KEY|ANTHROPIC_API_KEY|DEEPSEEK_API_KEY|GROQ_API_KEY|MISTRAL_API_KEY|COHERE_API_KEY|BRAVE_API_KEY|TAVILY_API_KEY|PERPLEXITY_API_KEY|GOOGLE_API_KEY)="
+    $temp_env = Get-Content ".env" | Where-Object { $_ -notmatch $clean_pattern }
     $temp_env | Set-Content ".env"
 
+    # Step 1: The Brain
     if ($b_binding -ne "") {
         Add-Content -Path ".env" -Value "LLM_BINDING=$b_binding"
         Add-Content -Path ".env" -Value "LLM_HOST=$b_host"
         Add-Content -Path ".env" -Value "LLM_API_KEY=$b_key"
         if ($b_env -ne "") { Add-Content -Path ".env" -Value "$b_env=$b_key" }
     }
+
+    # Step 2: The Librarian
     if ($l_binding -ne "") {
         Add-Content -Path ".env" -Value "EMBEDDING_BINDING=$l_binding"
         Add-Content -Path ".env" -Value "EMBEDDING_HOST=$l_host"
         Add-Content -Path ".env" -Value "EMBEDDING_API_KEY=$l_key"
         Add-Content -Path ".env" -Value "EMBEDDING_DIMENSION=$l_dim"
+        
+        $l_env_key = switch ($l_binding) {
+            "gemini" { "GEMINI_API_KEY" }
+            "openai" { "OPENAI_API_KEY" }
+            "cohere" { "COHERE_API_KEY" }
+            Default { "" }
+        }
+        if ($l_env_key -ne "" -and $l_env_key -ne $b_env) {
+            Add-Content -Path ".env" -Value "$l_env_key=$l_key"
+        }
     }
+
+    # Step 3: The Explorer
     if ($e_prov -ne "") {
         Add-Content -Path ".env" -Value "SEARCH_PROVIDER=$e_prov"
         Add-Content -Path ".env" -Value "SEARCH_API_KEY=$e_key"
+        $e_env_key = switch ($e_prov) {
+            "brave" { "BRAVE_API_KEY" }
+            "tavily" { "TAVILY_API_KEY" }
+            "perplexity" { "PERPLEXITY_API_KEY" }
+            Default { "" }
+        }
+        if ($e_env_key -ne "") {
+            Add-Content -Path ".env" -Value "$e_env_key=$e_key"
+        }
     }
 
-    Log-Success "Configuration saved to .env"
+    Log-Success "Configuration saved to .env (Legacy keys cleaned)"
     Write-Host ""
 }
 
