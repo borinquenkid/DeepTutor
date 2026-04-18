@@ -681,7 +681,9 @@ def _run_web_tour() -> None:
     step(2, total, "Install dependencies")
     # We automatically install core dependencies based on profile.
     # We only ask for the heavy Math Animator addon.
-    install_math_animator = confirm("Install Math Animator addon (Manim)?", default=True)
+    print(f"  {dim('Math Animator (Manim) allows you to generate mathematical videos.')}")
+    print(f"  {dim('It is optional and requires ~1GB disk space + LaTeX/FFmpeg.')}")
+    install_math_animator = confirm("Install Math Animator?", default=True)
     
     if not (shutil.which("node") and shutil.which("npm")):
         cmd = _node_install_cmd()
