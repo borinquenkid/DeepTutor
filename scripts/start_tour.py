@@ -679,27 +679,28 @@ def _run_web_tour() -> None:
     catalog = get_model_catalog_service().load()
 
     step(2, total, "Install dependencies")
-    if confirm("Install dependencies now?", default=True):
-        install_math_animator = confirm("Install Math Animator addon (Manim) now?", default=True)
-        if not (shutil.which("node") and shutil.which("npm")):
-            cmd = _node_install_cmd()
-            if cmd:
-                if confirm(f"Node.js not found. Install via {cmd[0]}?", default=True):
-                    _run_cmd(cmd, PROJECT_ROOT)
-            else:
-                log_warn("No automatic Node.js installer found for this platform.")
-        if install_math_animator:
-            _ensure_math_animator_system_deps()
+    # We automatically install core dependencies based on profile.
+    # We only ask for the heavy Math Animator addon.
+    install_math_animator = confirm("Install Math Animator addon (Manim)?", default=True)
+    
+    if not (shutil.which("node") and shutil.which("npm")):
+        cmd = _node_install_cmd()
+        if cmd:
+            log_info(f"Node.js not found. Installing via {cmd[0]}...")
+            _run_cmd(cmd, PROJECT_ROOT)
+        else:
+            log_warn("No automatic Node.js installer found for this platform.")
 
-        for cmd, cwd in _install_commands(
-            profile,
-            catalog,
-            include_math_animator=install_math_animator,
-        ):
-            _run_cmd(cmd, cwd)
-        log_success("Dependencies installed.")
-    else:
-        log_warn("Skipped. You can rerun the tour later.")
+    if install_math_animator:
+        _ensure_math_animator_system_deps()
+
+    for cmd, cwd in _install_commands(
+        profile,
+        catalog,
+        include_math_animator=install_math_animator,
+    ):
+        _run_cmd(cmd, cwd)
+    log_success("Dependencies installed.")
     print()
 
     # -- Step 3: Start temp server & wait for browser config ---------------
@@ -837,12 +838,9 @@ def _run_cli_tour() -> None:
     catalog = get_model_catalog_service().load()
 
     step(2, total, "Install dependencies")
-    if confirm("Install dependencies now?", default=True):
-        for cmd, cwd in _install_commands(profile, catalog):
-            _run_cmd(cmd, cwd)
-        log_success("Dependencies installed.")
-    else:
-        log_warn("Skipped. You can rerun the tour later.")
+    for cmd, cwd in _install_commands(profile, catalog):
+        _run_cmd(cmd, cwd)
+    log_success("Dependencies installed.")
     print()
     _save_cache({"step": 2, "mode": "cli", "profile": profile, "ports": ports})
 
