@@ -124,7 +124,7 @@ class ModelCatalogService:
 
         embedding_service = services.setdefault("embedding", _service_shell())
         if not embedding_service.get("profiles") and (
-            summary.embedding["model"] or summary.embedding["host"]
+            summary.embedding["model"] or summary.embedding["host"] or summary.embedding["api_key"]
         ):
             profile_id = "embedding-profile-default"
             model_id = "embedding-model-default"
