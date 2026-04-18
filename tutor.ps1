@@ -123,5 +123,86 @@ if (-not (Test-Path $PYTHON_EXE)) {
     $PYTHON_EXE = Join-Path $VENV_DIR "bin\python.exe"
 }
 
-# 4. Launch the Setup Tour
+# 4. Interactive Configuration
+# If .env doesn't exist or doesn't have essential LLM config, ask for it now to reduce friction
+if (-not (Test-Path ".env") -or -not (Select-String -Path ".env" -Pattern "LLM_API_KEY")) {
+    Write-Host "`n🔑 DeepTutor Setup" -ForegroundColor White -Style Bold
+    Write-Host "Choose your AI provider to get started:"
+    Write-Host "  1) Gemini (Recommended - Free & Fast)" -ForegroundColor Green
+    Write-Host "  2) OpenAI (GPT-4o, etc.)" -ForegroundColor Blue
+    Write-Host "  3) Anthropic (Claude 3.5)" -ForegroundColor Yellow
+    Write-Host "  4) DeepSeek"
+    Write-Host "  5) Groq (Ultra-fast)"
+    Write-Host "  6) Ollama (Local - No API Key needed)"
+    Write-Host "  s) Skip for now`n"
+    
+    $choice = Read-Host "Selection"
+    
+    $binding = ""
+    $host_url = ""
+    $key_url = ""
+    $env_key = ""
+
+    switch ($choice) {
+        "1" {
+            $binding = "gemini"
+            $host_url = "https://generativelanguage.googleapis.com/v1beta/openai/"
+            $key_url = "https://aistudio.google.com/app/apikey"
+            $env_key = "GEMINI_API_KEY"
+        }
+        "2" {
+            $binding = "openai"
+            $host_url = "https://api.openai.com/v1"
+            $key_url = "https://platform.openai.com/api-keys"
+            $env_key = "OPENAI_API_KEY"
+        }
+        "3" {
+            $binding = "anthropic"
+            $host_url = "https://api.anthropic.com/v1"
+            $key_url = "https://console.anthropic.com/settings/keys"
+            $env_key = "ANTHROPIC_API_KEY"
+        }
+        "4" {
+            $binding = "deepseek"
+            $host_url = "https://api.deepseek.com"
+            $key_url = "https://platform.deepseek.com/api_keys"
+            $env_key = "DEEPSEEK_API_KEY"
+        }
+        "5" {
+            $binding = "groq"
+            $host_url = "https://api.groq.com/openai/v1"
+            $key_url = "https://console.groq.com/keys"
+            $env_key = "GROQ_API_KEY"
+        }
+        "6" {
+            $binding = "ollama"
+            $host_url = "http://localhost:11434/v1"
+        }
+        Default {
+            Write-Host "Skipping interactive config..."
+        }
+    }
+
+    if ($binding -ne "") {
+        if (-not (Test-Path ".env")) { New-Item -Path ".env" -ItemType File }
+        
+        Add-Content -Path ".env" -Value "LLM_BINDING=$binding"
+        Add-Content -Path ".env" -Value "LLM_HOST=$host_url"
+        
+        if ($binding -ne "ollama") {
+            Write-Host "`nYou can get your API Key at: $key_url" -ForegroundColor Blue
+            $api_key = Read-Host "Paste your API Key"
+            if ($api_key -ne "") {
+                Add-Content -Path ".env" -Value "LLM_API_KEY=$api_key"
+                Add-Content -Path ".env" -Value "$env_key=$api_key"
+                Log-Success "Configuration saved to .env"
+            }
+        } else {
+            Log-Success "Ollama configuration saved to .env (ensure Ollama is running)"
+        }
+    }
+    Write-Host ""
+}
+
+# 5. Launch the Setup Tour
 & $PYTHON_EXE scripts\start_tour.py $args
