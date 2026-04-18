@@ -655,7 +655,7 @@ def _kill_process(proc: subprocess.Popen[str] | None, name: str) -> None:
 
 
 def _run_web_tour() -> None:
-    total = 4
+    total = 3
 
     # -- Step 1: Profile ---------------------------------------------------
     step(1, total, "Install profile")
@@ -669,22 +669,16 @@ def _run_web_tour() -> None:
     )
     _save_cache({"step": 1, "mode": "web", "profile": profile, "status": "running"})
 
-    # -- Step 2: Ports -----------------------------------------------------
-    step(2, total, "Ports")
+    # -- Step 2: Install dependencies --------------------------------------
     summary = get_env_store().as_summary()
     ports = {
         "backend": summary.backend_port,
         "frontend": summary.frontend_port,
     }
-    ports["frontend"] = int(text_input("Frontend port", str(ports["frontend"])))
-    ports["backend"] = int(text_input("Backend port", str(ports["backend"])))
-    print()
-    _save_cache({"step": 2, "mode": "web", "profile": profile, "ports": ports, "status": "running"})
 
-    # -- Step 3: Install dependencies --------------------------------------
     catalog = get_model_catalog_service().load()
 
-    step(3, total, "Install dependencies")
+    step(2, total, "Install dependencies")
     if confirm("Install dependencies now?", default=True):
         install_math_animator = confirm("Install Math Animator addon (Manim) now?", default=True)
         if not (shutil.which("node") and shutil.which("npm")):
@@ -708,8 +702,8 @@ def _run_web_tour() -> None:
         log_warn("Skipped. You can rerun the tour later.")
     print()
 
-    # -- Step 4: Start temp server & wait for browser config ---------------
-    step(4, total, "Configure in browser")
+    # -- Step 3: Start temp server & wait for browser config ---------------
+    step(3, total, "Configure in browser")
 
     # Write ports to .env for the temp server
     get_env_store().write(_build_env(ports, catalog))
@@ -717,7 +711,7 @@ def _run_web_tour() -> None:
     # Mark cache as waiting (the backend reads this)
     _save_cache(
         {
-            "step": 4,
+            "step": 3,
             "mode": "web",
             "profile": profile,
             "ports": ports,
@@ -820,7 +814,7 @@ def _run_web_tour() -> None:
 
 
 def _run_cli_tour() -> None:
-    total = 6
+    total = 5
 
     # -- Step 1: Profile ---------------------------------------------------
     step(1, total, "Install profile")
@@ -833,21 +827,16 @@ def _run_cli_tour() -> None:
     )
     _save_cache({"step": 1, "mode": "cli", "profile": profile})
 
-    # -- Step 2: Ports -----------------------------------------------------
-    step(2, total, "Ports")
+    # -- Step 2: Install dependencies --------------------------------------
     summary = get_env_store().as_summary()
     ports = {
         "backend": summary.backend_port,
         "frontend": summary.frontend_port,
     }
-    ports["backend"] = int(text_input("Backend port", str(ports["backend"])))
-    print()
-    _save_cache({"step": 2, "mode": "cli", "profile": profile, "ports": ports})
 
-    # -- Step 3: Install dependencies --------------------------------------
     catalog = get_model_catalog_service().load()
 
-    step(3, total, "Install dependencies")
+    step(2, total, "Install dependencies")
     if confirm("Install dependencies now?", default=True):
         for cmd, cwd in _install_commands(profile, catalog):
             _run_cmd(cmd, cwd)
@@ -855,10 +844,10 @@ def _run_cli_tour() -> None:
     else:
         log_warn("Skipped. You can rerun the tour later.")
     print()
-    _save_cache({"step": 3, "mode": "cli", "profile": profile, "ports": ports})
+    _save_cache({"step": 2, "mode": "cli", "profile": profile, "ports": ports})
 
-    # -- Step 4: Configure providers ---------------------------------------
-    step(4, total, "Configure providers")
+    # -- Step 3: Configure providers ---------------------------------------
+    step(3, total, "Configure providers")
     _configure_service(catalog, "llm")
     _configure_service(catalog, "embedding")
 
@@ -867,10 +856,10 @@ def _run_cli_tour() -> None:
         _configure_service(catalog, "search")
         search_enabled = True
 
-    _save_cache({"step": 4, "mode": "cli", "profile": profile, "ports": ports})
+    _save_cache({"step": 3, "mode": "cli", "profile": profile, "ports": ports})
 
-    # -- Step 5: Live diagnostics ------------------------------------------
-    step(5, total, "Verify connections")
+    # -- Step 4: Live diagnostics ------------------------------------------
+    step(4, total, "Verify connections")
     llm_ok = _stream_test("llm", catalog)
     print()
     emb_ok = _stream_test("embedding", catalog)
@@ -884,8 +873,8 @@ def _run_cli_tour() -> None:
         log_error("LLM and Embedding must both pass before saving.")
         raise SystemExit(1)
 
-    # -- Step 6: Review & apply --------------------------------------------
-    step(6, total, "Review & apply")
+    # -- Step 5: Review & apply --------------------------------------------
+    step(5, total, "Review & apply")
 
     llm_p = get_model_catalog_service().get_active_profile(catalog, "llm")
     llm_m = get_model_catalog_service().get_active_model(catalog, "llm")
