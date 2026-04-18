@@ -9,6 +9,7 @@ import {
   ChevronDown,
   ChevronRight,
   Database,
+  ExternalLink,
   Eye,
   EyeOff,
   Info,
