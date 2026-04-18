@@ -326,7 +326,8 @@ def _ensure_math_animator_system_deps() -> None:
     log_warn(f"Math animator system dependencies missing: {details}")
 
     installable = [dep for dep in missing if _math_animator_install_cmd(dep) is not None]
-    if installable and confirm("Install missing system dependencies automatically?", default=True):
+    if installable:
+        log_info(f"Installing missing system dependencies: {', '.join(installable)}...")
         for dep in installable:
             cmd = _math_animator_install_cmd(dep)
             if cmd:
