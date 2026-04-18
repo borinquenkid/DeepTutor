@@ -79,6 +79,15 @@ if (-not (Test-Path $VENV_DIR)) {
     Log-Info "Creating virtual environment in $VENV_DIR..."
     & $PYTHON_CMD -m venv $VENV_DIR
     Log-Success "Environment created."
+
+    $INT_PYTHON = Join-Path $VENV_DIR "Scripts\python.exe"
+    if (-not (Test-Path $INT_PYTHON)) { $INT_PYTHON = Join-Path $VENV_DIR "bin\python.exe" }
+
+    Log-Info "Installing dependencies (this may take a few minutes)..."
+    & $INT_PYTHON -m pip install --upgrade pip -q
+    & $INT_PYTHON -m pip install -r requirements.txt -q
+    & $INT_PYTHON -m pip install -e . -q
+    Log-Success "Dependencies installed."
 }
 
 # 3. Resolve internal Python

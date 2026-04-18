@@ -106,6 +106,19 @@ if [ ! -d "$VENV_DIR" ]; then
     log_info "Creating virtual environment in ${VENV_DIR}..."
     "$PYTHON_CMD" -m venv "$VENV_DIR"
     log_success "Environment created."
+    
+    # Resolve internal Python for initial install
+    if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" || "$OSTYPE" == "cygwin" ]]; then
+        INTERNAL_PYTHON="$VENV_DIR/Scripts/python.exe"
+    else
+        INTERNAL_PYTHON="$VENV_DIR/bin/python"
+    fi
+
+    log_info "Installing dependencies (this may take a few minutes)..."
+    "$INTERNAL_PYTHON" -m pip install --upgrade pip -q
+    "$INTERNAL_PYTHON" -m pip install -r requirements.txt -q
+    "$INTERNAL_PYTHON" -m pip install -e . -q
+    log_success "Dependencies installed."
 fi
 
 # 3. Resolve internal Python
