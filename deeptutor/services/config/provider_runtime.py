@@ -77,6 +77,13 @@ EMBEDDING_PROVIDERS: dict[str, EmbeddingProviderSpec] = {
         default_model="text-embedding-3-large",
         default_dim=3072,
     ),
+    "gemini": EmbeddingProviderSpec(
+        label="Gemini",
+        default_api_base="https://generativelanguage.googleapis.com/v1beta/openai/",
+        keywords=("gemini", "google"),
+        is_local=False, api_key_envs=("GEMINI_API_KEY", "GOOGLE_API_KEY"),
+        default_model="text-embedding-004", default_dim=768,
+    ),
     "azure_openai": EmbeddingProviderSpec(
         label="Azure OpenAI",
         mode="direct",
