@@ -190,28 +190,14 @@ function stringifyExtraHeaders(value: CatalogProfile["extra_headers"]): string {
 // Tour onboarding steps
 // ---------------------------------------------------------------------------
 
-const TOUR_GUIDE_STEPS = [
-  {
-    target: "tour-llm",
-    title: "1 / 4  —  LLM",
-    desc: "Configure your language model endpoint. This powers all chat and reasoning.",
-  },
-  {
-    target: "tour-embedding",
-    title: "2 / 4  —  Embedding",
-    desc: "Set the embedding model for knowledge retrieval.",
-  },
-  {
-    target: "tour-search",
-    title: "3 / 4  —  Search",
-    desc: "Optional: add a web search provider for real-time information.",
-  },
-  {
-    target: "tour-complete",
-    title: "4 / 4  —  Complete",
-    desc: "When you are ready, click here to test and launch DeepTutor.",
-  },
+const TOUR_STEPS = [
+  { target: "tour-llm", title: "Step 1: The Brain", desc: "Configure your language model endpoint. This powers all chat and reasoning." },
+  { target: "tour-embedding", title: "Step 2: The Librarian", desc: "Set the embedding model for knowledge retrieval. How the AI reads your documents." },
+  { target: "tour-search", title: "Step 3: The Explorer", desc: "Optional: add a web search provider for real-time information." },
+  { target: "tour-complete", title: "All Set!", desc: "Launch DeepTutor with your new configuration." },
 ];
+];
+
 
 const supportedSearchProviders = [
   "brave",
@@ -243,7 +229,7 @@ function SpotlightOverlay({
 }) {
   const { t } = useTranslation();
   const [rect, setRect] = useState<DOMRect | null>(null);
-  const guideStep = TOUR_GUIDE_STEPS[stepIndex];
+  const guideStep = TOUR_STEPS[stepIndex];
 
   useEffect(() => {
     if (!guideStep) return;
@@ -301,7 +287,7 @@ function SpotlightOverlay({
             onClick={onNext}
             className="inline-flex items-center gap-1 rounded-lg bg-[var(--foreground)] px-3 py-1.5 text-[12px] font-medium text-[var(--background)] transition-opacity hover:opacity-80"
           >
-            {stepIndex < TOUR_GUIDE_STEPS.length - 1 ? t("Next") : t("Got it")}
+            {stepIndex < TOUR_STEPS.length - 1 ? t("Next") : t("Got it")}
             <ChevronRight className="h-3 w-3" />
           </button>
         </div>
@@ -1117,10 +1103,8 @@ function SettingsPageContent() {
               )}
             </span>
             <span className="flex items-center gap-1.5">
-              <span
-                className={`inline-block h-1.5 w-1.5 rounded-full ${statusDotClass(Boolean(status?.embeddings.model), Boolean(status?.embeddings.error))}`}
-              />
-              {t("Emb")}
+              <span className={`inline-block h-1.5 w-1.5 rounded-full ${statusDotClass(Boolean(status?.embeddings.model), Boolean(status?.embeddings.error))}`} />
+              {t("Embedding")}
             </span>
             <span className="flex items-center gap-1.5">
               <span
@@ -1147,7 +1131,7 @@ function SettingsPageContent() {
                   }`}
                 >
                   {serviceIcon(service)}
-                  {service.toUpperCase()}
+                  {service === "llm" ? t("LLM") : service === "embedding" ? t("Embedding") : t("Search")}
                   <span className="text-[11px] text-[var(--muted-foreground)]/60">
                     {draft.services[service].profiles.length}
                   </span>
@@ -1666,22 +1650,19 @@ function SettingsPageContent() {
       </div>
 
       {/* ── Spotlight overlay (tour onboarding) ── */}
-      {isTourMode &&
-        tourGuideStep >= 0 &&
-        tourGuideStep < TOUR_GUIDE_STEPS.length &&
-        !tourCompleted && (
-          <SpotlightOverlay
-            stepIndex={tourGuideStep}
-            onNext={() => {
-              if (tourGuideStep < TOUR_GUIDE_STEPS.length - 1) {
-                setTourGuideStep((s) => s + 1);
-              } else {
-                setTourGuideStep(-1);
-              }
-            }}
-            onSkip={() => setTourGuideStep(-1)}
-          />
-        )}
+      {isTourMode && tourGuideStep >= 0 && tourGuideStep < TOUR_STEPS.length && !tourCompleted && (
+        <SpotlightOverlay
+          stepIndex={tourGuideStep}
+          onNext={() => {
+            if (tourGuideStep < TOUR_STEPS.length - 1) {
+              setTourGuideStep((s) => s + 1);
+            } else {
+              setTourGuideStep(-1);
+            }
+          }}
+          onSkip={() => setTourGuideStep(-1)}
+        />
+      )}
 
       {/* ── Test results modal (tour) ── */}
       {isTourMode && tourTestPhase !== "idle" && (

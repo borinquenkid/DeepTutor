@@ -3,7 +3,7 @@ import { defineConfig, devices } from "@playwright/test";
 const BASE_URL =
   process.env.WEB_BASE_URL ||
   process.env.NEXT_PUBLIC_API_BASE ||
-  "http://localhost:3000";
+  "http://localhost:3782";
 const SERIAL_MODE = process.env.PW_SERIAL === "1";
 
 export default defineConfig({
@@ -18,6 +18,11 @@ export default defineConfig({
     trace: "on-first-retry",
   },
   projects: [
+    {
+      name: "e2e",
+      testMatch: "**/*.test.ts",
+      use: { ...devices["Desktop Chrome"] },
+    },
     {
       name: "ui-audit",
       testMatch: "**/*.audit.ts",
