@@ -152,6 +152,90 @@ else
     PYTHON_EXE="$VENV_DIR/bin/python"
 fi
 
-# 4. Launch the Setup Tour
+# 4. Interactive Configuration
+# If .env doesn't exist or doesn't have essential LLM config, ask for it now to reduce friction
+if [ ! -f ".env" ] || ! grep -q "LLM_API_KEY" .env; then
+    echo -e "\n${BOLD}🔑 DeepTutor Setup${NC}"
+    echo -e "Choose your AI provider to get started:"
+    echo -e "  1) ${GREEN}Gemini${NC} (Recommended - Free & Fast)"
+    echo -e "  2) ${BLUE}OpenAI${NC} (GPT-4o, etc.)"
+    echo -e "  3) ${YELLOW}Anthropic${NC} (Claude 3.5)"
+    echo -e "  4) ${NC}DeepSeek${NC}"
+    echo -e "  5) ${NC}Groq${NC} (Ultra-fast)"
+    echo -e "  6) ${NC}Ollama${NC} (Local - No API Key needed)"
+    echo -e "  s) Skip for now\n"
+    
+    printf "${BOLD}Selection: ${NC}"
+    read -r CHOICE
+
+    BINDING=""
+    HOST=""
+    KEY_URL=""
+    ENV_KEY=""
+
+    case $CHOICE in
+        1)
+            BINDING="gemini"
+            HOST="https://generativelanguage.googleapis.com/v1beta/openai/"
+            KEY_URL="https://aistudio.google.com/app/apikey"
+            ENV_KEY="GEMINI_API_KEY"
+            ;;
+        2)
+            BINDING="openai"
+            HOST="https://api.openai.com/v1"
+            KEY_URL="https://platform.openai.com/api-keys"
+            ENV_KEY="OPENAI_API_KEY"
+            ;;
+        3)
+            BINDING="anthropic"
+            HOST="https://api.anthropic.com/v1"
+            KEY_URL="https://console.anthropic.com/settings/keys"
+            ENV_KEY="ANTHROPIC_API_KEY"
+            ;;
+        4)
+            BINDING="deepseek"
+            HOST="https://api.deepseek.com"
+            KEY_URL="https://platform.deepseek.com/api_keys"
+            ENV_KEY="DEEPSEEK_API_KEY"
+            ;;
+        5)
+            BINDING="groq"
+            HOST="https://api.groq.com/openai/v1"
+            KEY_URL="https://console.groq.com/keys"
+            ENV_KEY="GROQ_API_KEY"
+            ;;
+        6)
+            BINDING="ollama"
+            HOST="http://localhost:11434/v1"
+            ;;
+        *)
+            echo "Skipping interactive config..."
+            ;;
+    esac
+
+    if [ -n "$BINDING" ]; then
+        # Initialize .env if it doesn't exist
+        [ ! -f ".env" ] && touch .env
+        
+        echo "LLM_BINDING=$BINDING" >> .env
+        echo "LLM_HOST=$HOST" >> .env
+        
+        if [ "$BINDING" != "ollama" ]; then
+            echo -e "\nYou can get your API Key at: ${BLUE}$KEY_URL${NC}"
+            printf "${YELLOW}Paste your API Key: ${NC}"
+            read -r API_KEY
+            if [ -n "$API_KEY" ]; then
+                echo "LLM_API_KEY=$API_KEY" >> .env
+                echo "$ENV_KEY=$API_KEY" >> .env
+                log_success "Configuration saved to .env"
+            fi
+        else
+            log_success "Ollama configuration saved to .env (ensure Ollama is running)"
+        fi
+    fi
+    echo ""
+fi
+
+# 5. Launch the Setup Tour
 # We pass all arguments to the script
 "$PYTHON_EXE" scripts/start_tour.py "$@"
