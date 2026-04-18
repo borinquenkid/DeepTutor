@@ -202,17 +202,21 @@ if ($trigger_setup) {
 
         Add-Content -Path ".env" -Value "LLM_BINDING=$binding"
         Add-Content -Path ".env" -Value "LLM_HOST=$host_url"
+        Add-Content -Path ".env" -Value "EMBEDDING_BINDING=$binding"
+        Add-Content -Path ".env" -Value "EMBEDDING_HOST=$host_url"
         
         if ($binding -ne "ollama") {
             Write-Host "`nYou can get your API Key at: $key_url" -ForegroundColor Blue
             $api_key = Read-Host "Paste your API Key"
             if ($api_key -ne "") {
                 Add-Content -Path ".env" -Value "LLM_API_KEY=$api_key"
+                Add-Content -Path ".env" -Value "EMBEDDING_API_KEY=$api_key"
                 Add-Content -Path ".env" -Value "$env_key=$api_key"
-                Log-Success "Configuration saved to .env"
+                Log-Success "Configuration saved to .env (The Brain and Librarian are ready!)"
             }
         } else {
             Add-Content -Path ".env" -Value "LLM_API_KEY=ollama"
+            Add-Content -Path ".env" -Value "EMBEDDING_API_KEY=ollama"
             Log-Success "Ollama configuration saved to .env (ensure Ollama is running)"
         }
     }

@@ -236,17 +236,23 @@ if [ "$TRIGGER_SETUP" = true ]; then
         echo "LLM_BINDING=$BINDING" >> .env
         echo "LLM_HOST=$HOST" >> .env
         
+        # Also auto-configure the Librarian (Embedding) to match the Brain
+        echo "EMBEDDING_BINDING=$BINDING" >> .env
+        echo "EMBEDDING_HOST=$HOST" >> .env
+        
         if [ "$BINDING" != "ollama" ]; then
             echo -e "\nYou can get your API Key at: ${BLUE}$KEY_URL${NC}"
             printf "${YELLOW}Paste your API Key: ${NC}"
             read -r API_KEY
             if [ -n "$API_KEY" ]; then
                 echo "LLM_API_KEY=$API_KEY" >> .env
+                echo "EMBEDDING_API_KEY=$API_KEY" >> .env
                 echo "$ENV_KEY=$API_KEY" >> .env
-                log_success "Configuration saved to .env"
+                log_success "Configuration saved to .env (The Brain and Librarian are ready!)"
             fi
         else
             echo "LLM_API_KEY=ollama" >> .env
+            echo "EMBEDDING_API_KEY=ollama" >> .env
             log_success "Ollama configuration saved to .env (ensure Ollama is running)"
         fi
     fi
