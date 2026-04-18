@@ -175,7 +175,7 @@ if [ "$TRIGGER_SETUP" = true ]; then
     echo -e "Choose your AI provider for reasoning and chat:"
     echo -e "  1) Gemini"
     echo -e "  2) OpenAI"
-    echo -e "  3) ${YELLOW}Anthropic${NC}"
+    echo -e "  3) Anthropic"
     echo -e "  4) DeepSeek"
     echo -e "  5) Groq"
     echo -e "  6) Ollama (Local)"
@@ -187,20 +187,42 @@ if [ "$TRIGGER_SETUP" = true ]; then
     if [ "$BRAIN_CHOICE" == "0" ] && [ -f ".env" ]; then
         echo "Starting DeepTutor..."
     else
+        B_MODEL=""
         case $BRAIN_CHOICE in
-            1) B_BINDING="gemini"; B_HOST="https://generativelanguage.googleapis.com/v1beta/openai/"; B_KEY_URL="https://aistudio.google.com/app/apikey"; B_ENV="GEMINI_API_KEY" ;;
-            2) B_BINDING="openai"; B_HOST="https://api.openai.com/v1"; B_KEY_URL="https://platform.openai.com/api-keys"; B_ENV="OPENAI_API_KEY" ;;
-            3) B_BINDING="anthropic"; B_HOST="https://api.anthropic.com/v1"; B_KEY_URL="https://console.anthropic.com/settings/keys"; B_ENV="ANTHROPIC_API_KEY" ;;
-            4) B_BINDING="deepseek"; B_HOST="https://api.deepseek.com"; B_KEY_URL="https://platform.deepseek.com/api_keys"; B_ENV="DEEPSEEK_API_KEY" ;;
-            5) B_BINDING="groq"; B_HOST="https://api.groq.com/openai/v1"; B_KEY_URL="https://console.groq.com/keys"; B_ENV="GROQ_API_KEY" ;;
-            6) B_BINDING="ollama"; B_HOST="http://localhost:11434/v1"; B_ENV="" ;;
+            1)
+                B_BINDING="gemini"; B_HOST="https://generativelanguage.googleapis.com/v1beta/openai/"; B_KEY_URL="https://aistudio.google.com/app/apikey"; B_ENV="GEMINI_API_KEY"
+                echo -e "\nChoose model grade:"
+                echo -e "  1) ${GREEN}Standard${NC} (Gemini 1.5 Flash - Free & Fast)"
+                echo -e "  2) ${BLUE}Power${NC} (Gemini 1.5 Pro - Smarter)"
+                printf "${BOLD}Selection [1]: ${NC}"; read -r M_GRADE
+                [ "$M_GRADE" == "2" ] && B_MODEL="gemini-1.5-pro" || B_MODEL="gemini-1.5-flash"
+                ;;
+            2)
+                B_BINDING="openai"; B_HOST="https://api.openai.com/v1"; B_KEY_URL="https://platform.openai.com/api-keys"; B_ENV="OPENAI_API_KEY"
+                echo -e "\nChoose model grade:"
+                echo -e "  1) ${GREEN}Standard${NC} (GPT-4o-mini - Cheap & Fast)"
+                echo -e "  2) ${BLUE}Power${NC} (GPT-4o - Smarter)"
+                printf "${BOLD}Selection [1]: ${NC}"; read -r M_GRADE
+                [ "$M_GRADE" == "2" ] && B_MODEL="gpt-4o" || B_MODEL="gpt-4o-mini"
+                ;;
+            3)
+                B_BINDING="anthropic"; B_HOST="https://api.anthropic.com/v1"; B_KEY_URL="https://console.anthropic.com/settings/keys"; B_ENV="ANTHROPIC_API_KEY"
+                echo -e "\nChoose model grade:"
+                echo -e "  1) ${GREEN}Standard${NC} (Claude 3.5 Haiku)"
+                echo -e "  2) ${BLUE}Power${NC} (Claude 3.5 Sonnet)"
+                printf "${BOLD}Selection [1]: ${NC}"; read -r M_GRADE
+                [ "$M_GRADE" == "2" ] && B_MODEL="claude-3-5-sonnet-latest" || B_MODEL="claude-3-5-haiku-latest"
+                ;;
+            4) B_BINDING="deepseek"; B_HOST="https://api.deepseek.com"; B_KEY_URL="https://platform.deepseek.com/api_keys"; B_ENV="DEEPSEEK_API_KEY"; B_MODEL="deepseek-chat" ;;
+            5) B_BINDING="groq"; B_HOST="https://api.groq.com/openai/v1"; B_KEY_URL="https://console.groq.com/keys"; B_ENV="GROQ_API_KEY"; B_MODEL="llama-3.3-70b-versatile" ;;
+            6) B_BINDING="ollama"; B_HOST="http://localhost:11434/v1"; B_ENV=""; B_MODEL="llama3.2" ;;
             *) echo "Skipping configuration..."; B_BINDING="" ;;
         esac
 
         if [ -n "$B_BINDING" ]; then
             B_KEY="ollama"
             if [ "$B_BINDING" != "ollama" ]; then
-                echo -e "Get your key at: ${BLUE}$B_KEY_URL${NC}"
+                echo -e "\nGet your key at: ${BLUE}$B_KEY_URL${NC}"
                 printf "${YELLOW}Paste your Brain API Key: ${NC}"
                 read -r B_KEY
             fi
@@ -209,29 +231,39 @@ if [ "$TRIGGER_SETUP" = true ]; then
             echo -e "\n${BOLD}Step 2: Configure The Librarian (Embedding)${NC}"
             echo -e "Choose your AI provider for reading documents:"
             echo -e "  1) ${BOLD}Same as The Brain${NC}"
-            echo -e "  2) Gemini"
-            echo -e "  3) OpenAI"
+            echo -e "  2) Gemini (text-embedding-004)"
+            echo -e "  3) OpenAI (text-embedding-3-large)"
             echo -e "  4) Cohere"
             echo -e "  5) Ollama (Local)"
             
             printf "${BOLD}Selection: ${NC}"
             read -r LIB_CHOICE
 
-            case $BRAIN_CHOICE in 1) DEFAULT_DIM="768" ;; *) DEFAULT_DIM="3072" ;; esac
-
             case $LIB_CHOICE in
-                1) L_BINDING=$B_BINDING; L_HOST=$B_HOST; L_KEY=$B_KEY; L_DIM=$DEFAULT_DIM ;;
-                2) L_BINDING="gemini"; L_HOST="https://generativelanguage.googleapis.com/v1beta/openai/"; L_DIM="768" ;;
-                3) L_BINDING="openai"; L_HOST="https://api.openai.com/v1"; L_DIM="3072" ;;
-                4) L_BINDING="cohere"; L_HOST="https://api.cohere.ai"; L_DIM="1024" ;;
-                5) L_BINDING="ollama"; L_HOST="http://localhost:11434"; L_DIM="768"; L_KEY="ollama" ;;
+                1) L_BINDING=$B_BINDING; L_HOST=$B_HOST; L_KEY=$B_KEY ;;
+                2) L_BINDING="gemini"; L_HOST="https://generativelanguage.googleapis.com/v1beta/openai/" ;;
+                3) L_BINDING="openai"; L_HOST="https://api.openai.com/v1" ;;
+                4) L_BINDING="cohere"; L_HOST="https://api.cohere.ai" ;;
+                5) L_BINDING="ollama"; L_HOST="http://localhost:11434"; L_KEY="ollama" ;;
                 *) L_BINDING=""; echo "Skipping Librarian setup..." ;;
             esac
+
+            L_MODEL=""; L_DIM=""
+            if [ -n "$L_BINDING" ]; then
+                case $L_BINDING in
+                    gemini) L_MODEL="text-embedding-004"; L_DIM="768" ;;
+                    openai) L_MODEL="text-embedding-3-large"; L_DIM="3072" ;;
+                    cohere) L_MODEL="embed-v4.0"; L_DIM="1024" ;;
+                    ollama) L_MODEL="nomic-embed-text"; L_DIM="768" ;;
+                esac
+            fi
 
             if [ -n "$L_BINDING" ] && [ "$LIB_CHOICE" != "1" ] && [ "$L_BINDING" != "ollama" ]; then
                 printf "${YELLOW}Paste your Librarian API Key: ${NC}"
                 read -r L_KEY
             fi
+
+            # ── PHASE 3: THE EXPLORER ────────────────────────────────────────
 
             # ── PHASE 3: THE EXPLORER ────────────────────────────────────────
             echo -e "\n${BOLD}Step 3: Configure The Explorer (Web Search)${NC}"
@@ -277,8 +309,9 @@ if [ "$TRIGGER_SETUP" = true ]; then
             grep -vE "$CLEAN_PATTERN" .env > .env.tmp || true
             mv .env.tmp .env
 
-            [ -n "$B_BINDING" ] && { echo "LLM_BINDING=$B_BINDING" >> .env; echo "LLM_HOST=$B_HOST" >> .env; echo "LLM_API_KEY=$B_KEY" >> .env; [ -n "$B_ENV" ] && echo "$B_ENV=$B_KEY" >> .env; }
-            [ -n "$L_BINDING" ] && { echo "EMBEDDING_BINDING=$L_BINDING" >> .env; echo "EMBEDDING_HOST=$L_HOST" >> .env; echo "EMBEDDING_API_KEY=$L_KEY" >> .env; echo "EMBEDDING_DIMENSION=$L_DIM" >> .env; }
+            [ -n "$B_BINDING" ] && { echo "LLM_BINDING=$B_BINDING" >> .env; echo "LLM_HOST=$B_HOST" >> .env; echo "LLM_API_KEY=$B_KEY" >> .env; echo "LLM_MODEL=$B_MODEL" >> .env; [ -n "$B_ENV" ] && echo "$B_ENV=$B_KEY" >> .env; }
+            [ -n "$L_BINDING" ] && { echo "EMBEDDING_BINDING=$L_BINDING" >> .env; echo "EMBEDDING_HOST=$L_HOST" >> .env; echo "EMBEDDING_API_KEY=$L_KEY" >> .env; echo "EMBEDDING_MODEL=$L_MODEL" >> .env; echo "EMBEDDING_DIMENSION=$L_DIM" >> .env; }
+
             if [ -n "$E_PROV" ]; then
                 echo "SEARCH_PROVIDER=$E_PROV" >> .env
                 echo "SEARCH_API_KEY=$E_KEY" >> .env
