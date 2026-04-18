@@ -113,22 +113,32 @@ Before you begin, make sure the following are installed on your system:
 
 You'll also need an **API key** from at least one LLM provider (e.g. [OpenAI](https://platform.openai.com/api-keys), [DeepSeek](https://platform.deepseek.com/), [Anthropic](https://console.anthropic.com/)). The Setup Tour will walk you through entering it.
 
-### Option A — Setup Tour (Recommended)
+### Option A — Zero-Friction Setup (Recommended)
 
-A **single interactive script** that walks you through everything: dependency installation, environment configuration, live connection testing, and launch. No manual `.env` editing needed.
+A **single command** that handles everything: environment creation, git check/install, dependency installation, and launch. Perfect for both git clones and ZIP downloads.
 
+**Unix/macOS:**
 ```bash
 git clone https://github.com/HKUDS/DeepTutor.git
 cd DeepTutor
-
-# Create a Python virtual environment (pick one):
-conda create -n deeptutor python=3.11 && conda activate deeptutor   # if you use Anaconda/Miniconda
-python -m venv .venv && source .venv/bin/activate                    # otherwise (macOS/Linux)
-python -m venv .venv && .venv\Scripts\activate                       # otherwise (Windows)
-
-# Launch the guided tour
-python scripts/start_tour.py
+./tutor
 ```
+
+**Windows:**
+```powershell
+git clone https://github.com/HKUDS/DeepTutor.git
+cd DeepTutor
+.\tutor.ps1
+```
+
+### Option B — Manual Setup (Advanced)
+
+If you prefer to manage your environment manually:
+
+1. **Clone & Enter:** `git clone https://github.com/HKUDS/DeepTutor.git && cd DeepTutor`
+2. **Virtual Env:** `python -m venv .venv && source .venv/bin/activate` (or `.\.venv\Scripts\activate` on Windows)
+3. **Install Dependencies:** `pip install -e ".[server]"`
+4. **Launch Tour:** `python scripts/start_tour.py`
 
 The tour asks how you'd like to use DeepTutor:
 
