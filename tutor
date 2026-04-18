@@ -21,7 +21,39 @@ log_success() { echo -e "${GREEN}✅ $1${NC}"; }
 log_warn() { echo -e "${YELLOW}⚠️  $1${NC}"; }
 log_error() { echo -e "${RED}❌ $1${NC}"; }
 
-# 1. Find Python
+# 1. Check Git
+check_git() {
+    if ! command -v git >/dev/null 2>&1; then
+        log_warn "Git is not installed."
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            log_info "Attempting to install Git via xcode-select..."
+            # xcode-select --install is interactive, but it's the right way on Mac
+            xcode-select --install || true
+        elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+            if command -v apt-get >/dev/null 2>&1; then
+                log_info "Attempting to install Git via apt-get..."
+                sudo apt-get update && sudo apt-get install -y git
+            elif command -v yum >/dev/null 2>&1; then
+                log_info "Attempting to install Git via yum..."
+                sudo yum install -y git
+            fi
+        fi
+    fi
+
+    # If still not found, we can't do much more automatically
+    if ! command -v git >/dev/null 2>&1; then
+        log_error "Git is still not found. Some features might be limited."
+    elif [ ! -d ".git" ]; then
+        log_info "Initializing git repository..."
+        git init -q
+        git remote add origin https://github.com/HKUDS/DeepTutor.git
+        log_success "Git initialized and linked to origin."
+    fi
+}
+
+check_git
+
+# 2. Find Python
 find_python() {
     local cmd version
     for cmd in python3.12 python3.11 python3 python; do

@@ -8,7 +8,33 @@ function Log-Success($msg) { Write-Host "✅ $msg" -ForegroundColor Green }
 function Log-Warn($msg) { Write-Host "⚠️  $msg" -ForegroundColor Yellow }
 function Log-Error($msg) { Write-Host "❌ $msg" -ForegroundColor Red }
 
-# 1. Find Python
+# 1. Check Git
+function Check-Git {
+    if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+        Log-Warn "Git is not installed."
+        Log-Info "Attempting to install Git via winget..."
+        if (Get-Command winget -ErrorAction SilentlyContinue) {
+            winget install --id Git.Git -e --source winget --silent
+        } else {
+            Log-Error "winget not found. Please install Git manually from https://git-scm.com"
+        }
+    }
+
+    if (Get-Command git -ErrorAction SilentlyContinue) {
+        if (-not (Test-Path ".git")) {
+            Log-Info "Initializing git repository..."
+            & git init -q
+            & git remote add origin https://github.com/HKUDS/DeepTutor.git
+            Log-Success "Git initialized and linked to origin."
+        }
+    } else {
+        Log-Warn "Git check failed. Some functionality might be missing."
+    }
+}
+
+Check-Git
+
+# 2. Find Python
 $PYTHON_CMD = $null
 foreach ($cmd in @("python", "python3", "py")) {
     try {
