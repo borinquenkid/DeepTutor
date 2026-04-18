@@ -224,10 +224,15 @@ if ($trigger_setup) {
 
             # ── PHASE 3: THE EXPLORER ────────────────────────────────────────
             Write-Host "`nStep 3: Configure The Explorer (Web Search)" -ForegroundColor White -Style Bold
-            Write-Host "Optional: choose a web search provider:"
-            Write-Host "  1) Brave Search" -ForegroundColor Blue
-            Write-Host "  2) Tavily" -ForegroundColor Yellow
-            Write-Host "  3) Perplexity"
+            Write-Host "Optional: choose a web search provider to enable real-time info:"
+            Write-Host "  1) Brave Search (Highly Recommended)" -ForegroundColor Blue
+            Write-Host "  2) Tavily (AI-optimized)" -ForegroundColor Yellow
+            Write-Host "  3) DuckDuckGo (Free - No Key Needed)"
+            Write-Host "  4) Perplexity"
+            Write-Host "  5) Serper.dev (Google Search API)"
+            Write-Host "  6) Jina Reader"
+            Write-Host "  7) Exa.ai"
+            Write-Host "  8) Baidu (China)"
             Write-Host "  s) Skip`n"
             
             $e_choice = Read-Host "Selection"
@@ -236,17 +241,22 @@ if ($trigger_setup) {
             switch ($e_choice) {
                 "1" { $e_prov = "brave"; $e_url = "https://api.search.brave.com/app/dashboard" }
                 "2" { $e_prov = "tavily"; $e_url = "https://tavily.com/dashboard" }
-                "3" { $e_prov = "perplexity"; $e_url = "https://www.perplexity.ai/settings/api" }
+                "3" { $e_prov = "duckduckgo"; $e_key = "none" }
+                "4" { $e_prov = "perplexity"; $e_url = "https://www.perplexity.ai/settings/api" }
+                "5" { $e_prov = "serper"; $e_url = "https://serper.dev/dashboard" }
+                "6" { $e_prov = "jina"; $e_url = "https://jina.ai/reader/" }
+                "7" { $e_prov = "exa"; $e_url = "https://dashboard.exa.ai/" }
+                "8" { $e_prov = "baidu"; $e_url = "https://ziyuan.baidu.com/console/index" }
             }
 
-            if ($e_prov -ne "") {
+            if ($e_prov -ne "" -and $e_prov -ne "duckduckgo") {
                 Write-Host "Get your key at: $e_url" -ForegroundColor Blue
                 $e_key = Read-Host "Paste your Explorer API Key"
             }
 
             # ── SAVE TO .ENV ────────────────────────────────────────────────
             if (-not (Test-Path ".env")) { New-Item -Path ".env" -ItemType File }
-            $clean_pattern = "^(LLM_|EMBEDDING_|SEARCH_|GEMINI_API_KEY|OPENAI_API_KEY|ANTHROPIC_API_KEY|DEEPSEEK_API_KEY|GROQ_API_KEY|MISTRAL_API_KEY|COHERE_API_KEY|BRAVE_API_KEY|TAVILY_API_KEY|PERPLEXITY_API_KEY|GOOGLE_API_KEY)="
+            $clean_pattern = "^(LLM_|EMBEDDING_|SEARCH_|GEMINI_API_KEY|OPENAI_API_KEY|ANTHROPIC_API_KEY|DEEPSEEK_API_KEY|GROQ_API_KEY|MISTRAL_API_KEY|COHERE_API_KEY|BRAVE_API_KEY|TAVILY_API_KEY|PERPLEXITY_API_KEY|GOOGLE_API_KEY|SERPER_API_KEY|JINA_API_KEY|EXA_API_KEY|BAIDU_API_KEY)="
             $temp_env = Get-Content ".env" | Where-Object { $_ -notmatch $clean_pattern }
             $temp_env | Set-Content ".env"
 
@@ -279,6 +289,10 @@ if ($trigger_setup) {
                     "brave" { "BRAVE_API_KEY" }
                     "tavily" { "TAVILY_API_KEY" }
                     "perplexity" { "PERPLEXITY_API_KEY" }
+                    "serper" { "SERPER_API_KEY" }
+                    "jina" { "JINA_API_KEY" }
+                    "exa" { "EXA_API_KEY" }
+                    "baidu" { "BAIDU_API_KEY" }
                     Default { "" }
                 }
                 if ($e_env_key -ne "") {

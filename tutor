@@ -235,23 +235,37 @@ if [ "$TRIGGER_SETUP" = true ]; then
 
             # ── PHASE 3: THE EXPLORER ────────────────────────────────────────
             echo -e "\n${BOLD}Step 3: Configure The Explorer (Web Search)${NC}"
-            echo -e "Optional: choose a web search provider:"
-            echo -e "  1) ${BLUE}Brave Search${NC}"
-            echo -e "  2) ${YELLOW}Tavily${NC}"
-            echo -e "  3) Perplexity"
+            echo -e "Optional: choose a web search provider to enable real-time info:"
+            echo -e "  1) ${BLUE}Brave Search${NC} (Highly Recommended)"
+            echo -e "  2) ${YELLOW}Tavily${NC} (AI-optimized)"
+            echo -e "  3) DuckDuckGo (Free - No Key Needed)"
+            echo -e "  4) Perplexity"
+            echo -e "  5) Serper.dev (Google Search API)"
+            echo -e "  6) Jina Reader"
+            echo -e "  7) Exa.ai"
+            echo -e "  8) Baidu (China)"
             echo -e "  s) Skip\n"
             
             printf "${BOLD}Selection: ${NC}"
             read -r EXP_CHOICE
 
+            E_PROV=""
+            E_URL=""
+            E_KEY=""
+
             case $EXP_CHOICE in
                 1) E_PROV="brave"; E_URL="https://api.search.brave.com/app/dashboard" ;;
                 2) E_PROV="tavily"; E_URL="https://tavily.com/dashboard" ;;
-                3) E_PROV="perplexity"; E_URL="https://www.perplexity.ai/settings/api" ;;
+                3) E_PROV="duckduckgo"; E_KEY="none" ;;
+                4) E_PROV="perplexity"; E_URL="https://www.perplexity.ai/settings/api" ;;
+                5) E_PROV="serper"; E_URL="https://serper.dev/dashboard" ;;
+                6) E_PROV="jina"; E_URL="https://jina.ai/reader/" ;;
+                7) E_PROV="exa"; E_URL="https://dashboard.exa.ai/" ;;
+                8) E_PROV="baidu"; E_URL="https://ziyuan.baidu.com/console/index" ;;
                 *) E_PROV="" ;;
             esac
 
-            if [ -n "$E_PROV" ]; then
+            if [ -n "$E_PROV" ] && [ "$E_PROV" != "duckduckgo" ]; then
                 echo -e "Get your key at: ${BLUE}$E_URL${NC}"
                 printf "${YELLOW}Paste your Explorer API Key: ${NC}"
                 read -r E_KEY
@@ -259,13 +273,25 @@ if [ "$TRIGGER_SETUP" = true ]; then
 
             # ── SAVE TO .ENV ────────────────────────────────────────────────
             [ ! -f ".env" ] && touch .env
-            CLEAN_PATTERN="^(LLM_|EMBEDDING_|SEARCH_|GEMINI_API_KEY|OPENAI_API_KEY|ANTHROPIC_API_KEY|DEEPSEEK_API_KEY|GROQ_API_KEY|MISTRAL_API_KEY|COHERE_API_KEY|BRAVE_API_KEY|TAVILY_API_KEY|PERPLEXITY_API_KEY|GOOGLE_API_KEY)="
+            CLEAN_PATTERN="^(LLM_|EMBEDDING_|SEARCH_|GEMINI_API_KEY|OPENAI_API_KEY|ANTHROPIC_API_KEY|DEEPSEEK_API_KEY|GROQ_API_KEY|MISTRAL_API_KEY|COHERE_API_KEY|BRAVE_API_KEY|TAVILY_API_KEY|PERPLEXITY_API_KEY|GOOGLE_API_KEY|SERPER_API_KEY|JINA_API_KEY|EXA_API_KEY|BAIDU_API_KEY)="
             grep -vE "$CLEAN_PATTERN" .env > .env.tmp || true
             mv .env.tmp .env
 
             [ -n "$B_BINDING" ] && { echo "LLM_BINDING=$B_BINDING" >> .env; echo "LLM_HOST=$B_HOST" >> .env; echo "LLM_API_KEY=$B_KEY" >> .env; [ -n "$B_ENV" ] && echo "$B_ENV=$B_KEY" >> .env; }
             [ -n "$L_BINDING" ] && { echo "EMBEDDING_BINDING=$L_BINDING" >> .env; echo "EMBEDDING_HOST=$L_HOST" >> .env; echo "EMBEDDING_API_KEY=$L_KEY" >> .env; echo "EMBEDDING_DIMENSION=$L_DIM" >> .env; }
-            [ -n "$E_PROV" ] && { echo "SEARCH_PROVIDER=$E_PROV" >> .env; echo "SEARCH_API_KEY=$E_KEY" >> .env; }
+            if [ -n "$E_PROV" ]; then
+                echo "SEARCH_PROVIDER=$E_PROV" >> .env
+                echo "SEARCH_API_KEY=$E_KEY" >> .env
+                case $E_PROV in
+                    brave) echo "BRAVE_API_KEY=$E_KEY" >> .env ;;
+                    tavily) echo "TAVILY_API_KEY=$E_KEY" >> .env ;;
+                    perplexity) echo "PERPLEXITY_API_KEY=$E_KEY" >> .env ;;
+                    serper) echo "SERPER_API_KEY=$E_KEY" >> .env ;;
+                    jina) echo "JINA_API_KEY=$E_KEY" >> .env ;;
+                    exa) echo "EXA_API_KEY=$E_KEY" >> .env ;;
+                    baidu) echo "BAIDU_API_KEY=$E_KEY" >> .env ;;
+                esac
+            fi
 
             log_success "Configuration saved to .env"
         fi
