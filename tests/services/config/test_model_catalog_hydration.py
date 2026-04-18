@@ -103,3 +103,34 @@ def test_hydrate_ollama_from_env(tmp_path: Path) -> None:
         assert emb["binding"] == "ollama"
         assert emb["models"][0]["model"] == "nomic-embed-text"
         assert emb["models"][0]["dimension"] == "768"
+
+
+def test_hydrate_mixed_providers_from_env(tmp_path: Path) -> None:
+    """Test that mixed providers (Gemini for Brain, OpenAI for Librarian) hydrate correctly."""
+    env_path = tmp_path / ".env"
+    env_path.write_text(
+        "LLM_BINDING=gemini\n"
+        "LLM_API_KEY=key-gemini\n"
+        "EMBEDDING_BINDING=openai\n"
+        "EMBEDDING_API_KEY=key-openai\n",
+        encoding="utf-8"
+    )
+    
+    catalog_path = tmp_path / "model_catalog.json"
+    
+    with patch("deeptutor.services.config.model_catalog.get_env_store") as mock_get_env:
+        mock_get_env.return_value = EnvStore(path=env_path)
+        
+        service = ModelCatalogService(path=catalog_path)
+        catalog = service.load()
+        
+        # Brain should be Gemini
+        llm = catalog["services"]["llm"]["profiles"][0]
+        assert llm["binding"] == "gemini"
+        assert llm["models"][0]["model"] == "gemini-1.5-flash"
+        
+        # Librarian should be OpenAI
+        emb = catalog["services"]["embedding"]["profiles"][0]
+        assert emb["binding"] == "openai"
+        assert emb["models"][0]["dimension"] == "3072"
+        assert emb["models"][0]["model"] == "text-embedding-3-large"
