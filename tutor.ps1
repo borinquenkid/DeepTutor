@@ -124,8 +124,18 @@ if (-not (Test-Path $PYTHON_EXE)) {
 }
 
 # 4. Interactive Configuration
-# If .env doesn't exist or doesn't have essential LLM config, ask for it now to reduce friction
-if (-not (Test-Path ".env") -or -not (Select-String -Path ".env" -Pattern "LLM_API_KEY")) {
+# If .env doesn't exist or doesn't have a non-empty LLM_API_KEY, ask for it
+$trigger_setup = $false
+if (-not (Test-Path ".env")) {
+    $trigger_setup = $true
+} else {
+    $env_content = Get-Content ".env"
+    if (-not ($env_content | Select-String -Pattern "LLM_API_KEY=.+")) {
+        $trigger_setup = $true
+    }
+}
+
+if ($trigger_setup) {
     Write-Host "`n🔑 DeepTutor Setup" -ForegroundColor White -Style Bold
     Write-Host "Choose your AI provider to get started:"
     Write-Host "  1) Gemini (Recommended - Free & Fast)" -ForegroundColor Green
@@ -186,6 +196,10 @@ if (-not (Test-Path ".env") -or -not (Select-String -Path ".env" -Pattern "LLM_A
     if ($binding -ne "") {
         if (-not (Test-Path ".env")) { New-Item -Path ".env" -ItemType File }
         
+        # Clean up existing keys to avoid duplicates
+        $temp_env = Get-Content ".env" | Where-Object { $_ -notmatch "^(LLM_BINDING|LLM_HOST|LLM_API_KEY|$env_key)=" }
+        $temp_env | Set-Content ".env"
+
         Add-Content -Path ".env" -Value "LLM_BINDING=$binding"
         Add-Content -Path ".env" -Value "LLM_HOST=$host_url"
         
@@ -198,6 +212,7 @@ if (-not (Test-Path ".env") -or -not (Select-String -Path ".env" -Pattern "LLM_A
                 Log-Success "Configuration saved to .env"
             }
         } else {
+            Add-Content -Path ".env" -Value "LLM_API_KEY=ollama"
             Log-Success "Ollama configuration saved to .env (ensure Ollama is running)"
         }
     }

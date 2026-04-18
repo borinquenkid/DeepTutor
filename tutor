@@ -153,8 +153,17 @@ else
 fi
 
 # 4. Interactive Configuration
-# If .env doesn't exist or doesn't have essential LLM config, ask for it now to reduce friction
-if [ ! -f ".env" ] || ! grep -q "LLM_API_KEY" .env; then
+# If .env doesn't exist or has empty/missing LLM config, ask for it now to reduce friction
+TRIGGER_SETUP=false
+if [ ! -f ".env" ]; then
+    TRIGGER_SETUP=true
+elif ! grep -q "LLM_API_KEY=." .env; then
+    # Matches LLM_API_KEY= followed by at least one character
+    # This triggers if key is missing or empty
+    TRIGGER_SETUP=true
+fi
+
+if [ "$TRIGGER_SETUP" = true ]; then
     echo -e "\n${BOLD}🔑 DeepTutor Setup${NC}"
     echo -e "Choose your AI provider to get started:"
     echo -e "  1) ${GREEN}Gemini${NC} (Recommended - Free & Fast)"
@@ -208,8 +217,11 @@ if [ ! -f ".env" ] || ! grep -q "LLM_API_KEY" .env; then
             BINDING="ollama"
             HOST="http://localhost:11434/v1"
             ;;
-        *)
+        s|S)
             echo "Skipping interactive config..."
+            ;;
+        *)
+            echo "Invalid selection, skipping interactive config..."
             ;;
     esac
 
@@ -217,6 +229,10 @@ if [ ! -f ".env" ] || ! grep -q "LLM_API_KEY" .env; then
         # Initialize .env if it doesn't exist
         [ ! -f ".env" ] && touch .env
         
+        # Clean up any existing (likely empty) keys to avoid duplicates
+        grep -vE "^(LLM_BINDING|LLM_HOST|LLM_API_KEY|$ENV_KEY)=" .env > .env.tmp || true
+        mv .env.tmp .env
+
         echo "LLM_BINDING=$BINDING" >> .env
         echo "LLM_HOST=$HOST" >> .env
         
@@ -230,6 +246,7 @@ if [ ! -f ".env" ] || ! grep -q "LLM_API_KEY" .env; then
                 log_success "Configuration saved to .env"
             fi
         else
+            echo "LLM_API_KEY=ollama" >> .env
             log_success "Ollama configuration saved to .env (ensure Ollama is running)"
         fi
     fi
