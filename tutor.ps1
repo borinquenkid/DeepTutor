@@ -25,7 +25,29 @@ function Check-Git {
             Log-Info "Initializing git repository..."
             & git init -q
             & git remote add origin https://github.com/HKUDS/DeepTutor.git
+            & git fetch origin -q
+            & git checkout -b main origin/main -q
             Log-Success "Git initialized and linked to origin."
+        } else {
+            # Check for updates (best effort, don't hang)
+            Log-Info "Checking for updates..."
+            try {
+                # Fetch updates in the background or quickly
+                & git fetch origin -q
+                
+                $local = & git rev-parse @
+                $upstream = & git rev-parse @{u}
+                $base = & git merge-base @ @{u}
+
+                if ($local -eq $upstream) {
+                    Log-Success "DeepTutor is up to date."
+                } elseif ($local -eq $base) {
+                    Log-Warn "Updates are available!"
+                    Write-Host "  Run 'git pull' to update to the latest version."
+                }
+            } catch {
+                Log-Warn "Could not check for updates (is the network up?)"
+            }
         }
     } else {
         Log-Warn "Git check failed. Some functionality might be missing."

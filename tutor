@@ -47,7 +47,31 @@ check_git() {
         log_info "Initializing git repository..."
         git init -q
         git remote add origin https://github.com/HKUDS/DeepTutor.git
+        git fetch origin -q
+        git checkout -b main origin/main -q || git checkout main -q
         log_success "Git initialized and linked to origin."
+    else
+        # Check for updates (non-blocking-ish)
+        log_info "Checking for updates..."
+        git fetch origin -q &
+        FETCH_PID=$!
+        
+        # Give it a short timeout (3s) to not hang the boot
+        ( sleep 3; kill $FETCH_PID 2>/dev/null ) &
+        wait $FETCH_PID 2>/dev/null || true
+
+        UPSTREAM='@{u}'
+        LOCAL=$(git rev-parse @ 2>/dev/null || echo "0")
+        REMOTE=$(git rev-parse "$UPSTREAM" 2>/dev/null || echo "0")
+        BASE=$(git merge-base @ "$UPSTREAM" 2>/dev/null || echo "0")
+
+        if [ "$LOCAL" = "$REMOTE" ]; then
+            log_success "DeepTutor is up to date."
+        elif [ "$LOCAL" = "$BASE" ]; then
+            log_warn "Updates are available!"
+            echo -e "  Run ${BOLD}git pull${NC} to update to the latest version."
+            # We could offer to pull automatically here if we want to be aggressive
+        fi
     fi
 }
 
