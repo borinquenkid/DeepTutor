@@ -1,0 +1,64 @@
+#!/bin/bash
+# DeepTutor — Zero-friction entry point
+
+set -e
+
+# Configuration
+VENV_DIR=".venv"
+MIN_PYTHON="3.11"
+
+# ANSI colors
+BLUE='\033[38;5;111m'
+GREEN='\033[38;5;78m'
+YELLOW='\033[38;5;214m'
+RED='\033[38;5;203m'
+BOLD='\033[1m'
+NC='\033[0m'
+
+# Helpers
+log_info() { echo -e "${BLUE}ℹ️  $1${NC}"; }
+log_success() { echo -e "${GREEN}✅ $1${NC}"; }
+log_warn() { echo -e "${YELLOW}⚠️  $1${NC}"; }
+log_error() { echo -e "${RED}❌ $1${NC}"; }
+
+# 1. Find Python
+find_python() {
+    local cmd version
+    for cmd in python3.12 python3.11 python3 python; do
+        if command -v "$cmd" >/dev/null 2>&1; then
+            version=$("$cmd" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null || echo "0.0")
+            # Simple version comparison: if $version >= $MIN_PYTHON
+            if [[ "$version" == "$MIN_PYTHON" ]] || [[ "$version" > "$MIN_PYTHON" ]]; then
+                echo "$cmd"
+                return 0
+            fi
+        fi
+    done
+    return 1
+}
+
+PYTHON_CMD=$(find_python)
+
+if [ -z "$PYTHON_CMD" ]; then
+    log_error "DeepTutor requires Python ${MIN_PYTHON}+."
+    log_info "Please install it from https://python.org or your package manager."
+    exit 1
+fi
+
+# 2. Virtual Environment
+if [ ! -d "$VENV_DIR" ]; then
+    log_info "Creating virtual environment in ${VENV_DIR}..."
+    "$PYTHON_CMD" -m venv "$VENV_DIR"
+    log_success "Environment created."
+fi
+
+# 3. Resolve internal Python
+if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" || "$OSTYPE" == "cygwin" ]]; then
+    PYTHON_EXE="$VENV_DIR/Scripts/python.exe"
+else
+    PYTHON_EXE="$VENV_DIR/bin/python"
+fi
+
+# 4. Launch the Setup Tour
+# We pass all arguments to the script
+"$PYTHON_EXE" scripts/start_tour.py "$@"
