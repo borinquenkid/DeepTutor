@@ -173,8 +173,8 @@ if [ "$TRIGGER_SETUP" = true ]; then
     # ── PHASE 1: THE BRAIN ───────────────────────────────────────────
     echo -e "\n${BOLD}Step 1: Configure The Brain (LLM)${NC}"
     echo -e "Choose your AI provider for reasoning and chat:"
-    echo -e "  1) ${GREEN}Gemini${NC} (Recommended)"
-    echo -e "  2) ${BLUE}OpenAI${NC}"
+    echo -e "  1) Gemini"
+    echo -e "  2) OpenAI"
     echo -e "  3) ${YELLOW}Anthropic${NC}"
     echo -e "  4) DeepSeek"
     echo -e "  5) Groq"

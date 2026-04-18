@@ -163,8 +163,8 @@ if ($trigger_setup) {
     # ── PHASE 1: THE BRAIN ───────────────────────────────────────────
     Write-Host "`nStep 1: Configure The Brain (LLM)" -ForegroundColor White -Style Bold
     Write-Host "Choose your AI provider for reasoning and chat:"
-    Write-Host "  1) Gemini (Recommended)" -ForegroundColor Green
-    Write-Host "  2) OpenAI" -ForegroundColor Blue
+    Write-Host "  1) Gemini"
+    Write-Host "  2) OpenAI"
     Write-Host "  3) Anthropic" -ForegroundColor Yellow
     Write-Host "  4) DeepSeek"
     Write-Host "  5) Groq"
