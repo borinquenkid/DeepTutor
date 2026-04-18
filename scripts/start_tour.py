@@ -655,56 +655,62 @@ def _kill_process(proc: subprocess.Popen[str] | None, name: str) -> None:
         proc.kill()
 
 
-def _run_web_tour() -> None:
+def _run_web_tour(cache: dict[str, Any] | None = None) -> None:
     total = 3
+    start_step = cache.get("step", 0) if cache else 0
 
     # -- Step 1: Profile ---------------------------------------------------
-    step(1, total, "Install profile")
-    profile = select(
-        "Choose a dependency profile",
-        options = [
-            ("web-basic", "Standard Chat", "Core App (Fastest) — AI conversation & web interface"),
-            ("web-rag", "Knowledge Hub", "Full Feature — Adds document support (PDF, TXT, RAG search)"),
-        ]
-
-    )
-    _save_cache({"step": 1, "mode": "web", "profile": profile, "status": "running"})
+    profile = cache.get("profile") if cache else None
+    if start_step < 1 or not profile:
+        step(1, total, "Install profile")
+        profile = select(
+            "Choose a dependency profile",
+            options = [
+                ("web-basic", "Standard Chat", "Core App (Fastest) — AI conversation & web interface"),
+                ("web-rag", "Knowledge Hub", "Full Feature — Adds document support (PDF, TXT, RAG search)"),
+            ]
+        )
+        _save_cache({"step": 1, "mode": "web", "profile": profile, "status": "running"})
 
     # -- Step 2: Install dependencies --------------------------------------
     summary = get_env_store().as_summary()
-    ports = {
-        "backend": summary.backend_port,
-        "frontend": summary.frontend_port,
-    }
+    ports = cache.get("ports") if cache else None
+    if not ports:
+        ports = {
+            "backend": summary.backend_port,
+            "frontend": summary.frontend_port,
+        }
 
     catalog = get_model_catalog_service().load()
 
-    step(2, total, "Install dependencies")
-    # We automatically install core dependencies based on profile.
-    # We only ask for the heavy Math Animator addon.
-    print(f"  {dim('Math Animator (Manim) allows you to generate mathematical videos.')}")
-    print(f"  {dim('It is optional and requires ~1GB disk space + LaTeX/FFmpeg.')}")
-    install_math_animator = confirm("Install Math Animator?", default=True)
-    
-    if not (shutil.which("node") and shutil.which("npm")):
-        cmd = _node_install_cmd()
-        if cmd:
-            log_info(f"Node.js not found. Installing via {cmd[0]}...")
-            _run_cmd(cmd, PROJECT_ROOT)
-        else:
-            log_warn("No automatic Node.js installer found for this platform.")
+    if start_step < 2:
+        step(2, total, "Install dependencies")
+        # We automatically install core dependencies based on profile.
+        # We only ask for the heavy Math Animator addon.
+        print(f"  {dim('Math Animator (Manim) allows you to generate mathematical videos.')}")
+        print(f"  {dim('It is optional and requires ~1GB disk space + LaTeX/FFmpeg.')}")
+        install_math_animator = confirm("Install Math Animator?", default=True)
+        
+        if not (shutil.which("node") and shutil.which("npm")):
+            cmd = _node_install_cmd()
+            if cmd:
+                log_info(f"Node.js not found. Installing via {cmd[0]}...")
+                _run_cmd(cmd, PROJECT_ROOT)
+            else:
+                log_warn("No automatic Node.js installer found for this platform.")
 
-    if install_math_animator:
-        _ensure_math_animator_system_deps()
+        if install_math_animator:
+            _ensure_math_animator_system_deps()
 
-    for cmd, cwd in _install_commands(
-        profile,
-        catalog,
-        include_math_animator=install_math_animator,
-    ):
-        _run_cmd(cmd, cwd)
-    log_success("Dependencies installed.")
-    print()
+        for cmd, cwd in _install_commands(
+            profile,
+            catalog,
+            include_math_animator=install_math_animator,
+        ):
+            _run_cmd(cmd, cwd)
+        log_success("Dependencies installed.")
+        print()
+        _save_cache({"step": 2, "mode": "web", "profile": profile, "ports": ports, "status": "running"})
 
     # -- Step 3: Start temp server & wait for browser config ---------------
     step(3, total, "Configure in browser")
@@ -817,62 +823,71 @@ def _run_web_tour() -> None:
 # ===================================================================
 
 
-def _run_cli_tour() -> None:
+def _run_cli_tour(cache: dict[str, Any] | None = None) -> None:
     total = 5
+    start_step = cache.get("step", 0) if cache else 0
 
     # -- Step 1: Profile ---------------------------------------------------
-    step(1, total, "Install profile")
-    profile = select(
-        "Choose a dependency profile",
-        [
-            ("cli-core", "cli-core", "Minimal CLI (~80 MB)"),
-            ("cli-rag", "cli-rag", "+ LlamaIndex RAG"),
-        ],
-    )
-    _save_cache({"step": 1, "mode": "cli", "profile": profile})
+    profile = cache.get("profile") if cache else None
+    if start_step < 1 or not profile:
+        step(1, total, "Install profile")
+        profile = select(
+            "Choose a dependency profile",
+            [
+                ("cli-core", "cli-core", "Minimal CLI (~80 MB)"),
+                ("cli-rag", "cli-rag", "+ LlamaIndex RAG"),
+            ],
+        )
+        _save_cache({"step": 1, "mode": "cli", "profile": profile})
 
     # -- Step 2: Install dependencies --------------------------------------
     summary = get_env_store().as_summary()
-    ports = {
-        "backend": summary.backend_port,
-        "frontend": summary.frontend_port,
-    }
+    ports = cache.get("ports") if cache else None
+    if not ports:
+        ports = {
+            "backend": summary.backend_port,
+            "frontend": summary.frontend_port,
+        }
 
     catalog = get_model_catalog_service().load()
 
-    step(2, total, "Install dependencies")
-    for cmd, cwd in _install_commands(profile, catalog):
-        _run_cmd(cmd, cwd)
-    log_success("Dependencies installed.")
-    print()
-    _save_cache({"step": 2, "mode": "cli", "profile": profile, "ports": ports})
+    if start_step < 2:
+        step(2, total, "Install dependencies")
+        for cmd, cwd in _install_commands(profile, catalog):
+            _run_cmd(cmd, cwd)
+        log_success("Dependencies installed.")
+        print()
+        _save_cache({"step": 2, "mode": "cli", "profile": profile, "ports": ports})
 
     # -- Step 3: Configure providers ---------------------------------------
-    step(3, total, "Configure providers")
-    _configure_service(catalog, "llm")
-    _configure_service(catalog, "embedding")
+    search_enabled = cache.get("search_enabled", False) if cache else False
+    if start_step < 3:
+        step(3, total, "Configure providers")
+        _configure_service(catalog, "llm")
+        _configure_service(catalog, "embedding")
 
-    search_enabled = False
-    if confirm("Configure a search provider?", default=False):
-        _configure_service(catalog, "search")
-        search_enabled = True
+        if confirm("Configure a search provider?", default=False):
+            _configure_service(catalog, "search")
+            search_enabled = True
 
-    _save_cache({"step": 3, "mode": "cli", "profile": profile, "ports": ports})
+        _save_cache({"step": 3, "mode": "cli", "profile": profile, "ports": ports, "search_enabled": search_enabled})
 
     # -- Step 4: Live diagnostics ------------------------------------------
-    step(4, total, "Verify connections")
-    llm_ok = _stream_test("llm", catalog)
-    print()
-    emb_ok = _stream_test("embedding", catalog)
-    print()
-
-    if search_enabled:
-        _stream_test("search", catalog)
+    if start_step < 4:
+        step(4, total, "Verify connections")
+        llm_ok = _stream_test("llm", catalog)
+        print()
+        emb_ok = _stream_test("embedding", catalog)
         print()
 
-    if not llm_ok or not emb_ok:
-        log_error("LLM and Embedding must both pass before saving.")
-        raise SystemExit(1)
+        if search_enabled:
+            _stream_test("search", catalog)
+            print()
+
+        if not llm_ok or not emb_ok:
+            log_error("LLM and Embedding must both pass before saving.")
+            raise SystemExit(1)
+        _save_cache({"step": 4, "mode": "cli", "profile": profile, "ports": ports, "search_enabled": search_enabled})
 
     # -- Step 5: Review & apply --------------------------------------------
     step(5, total, "Review & apply")
@@ -936,20 +951,22 @@ def run_tour() -> None:
         if not confirm("Resume where you left off?", default=True):
             _cleanup_cache()
             cache = None
-
-    step(1, "?", "Choose mode")
-    mode = select(
-        "How would you like to use DeepTutor?",
-        [
-            ("web", "web", "Browser UI — configure in Settings page (recommended)"),
-            ("cli", "cli", "Terminal only — configure interactively here"),
-        ],
-    )
+    
+    mode = cache.get("mode") if cache else None
+    if not mode:
+        step(1, "?", "Choose mode")
+        mode = select(
+            "How would you like to use DeepTutor?",
+            [
+                ("web", "web", "Browser UI — configure in Settings page (recommended)"),
+                ("cli", "cli", "Terminal only — configure interactively here"),
+            ],
+        )
 
     if mode == "web":
-        _run_web_tour()
+        _run_web_tour(cache)
     else:
-        _run_cli_tour()
+        _run_cli_tour(cache)
 
 
 def main() -> None:
