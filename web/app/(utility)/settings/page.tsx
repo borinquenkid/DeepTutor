@@ -357,7 +357,7 @@ function TestResultsModal({
               <div className="flex items-center gap-2.5">
                 {serviceIcon(svc)}
                 <span className="text-[13px] font-medium text-[var(--foreground)]">
-                  {svc.toUpperCase()}
+                  {svc === "llm" ? t("LLM") : svc === "embedding" ? t("Embedding") : t("Search")}
                 </span>
               </div>
               <div className="flex items-center gap-2">
