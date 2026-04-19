@@ -27,6 +27,10 @@ class GoogleEmbeddingAdapter(BaseEmbeddingAdapter):
             
         base = self.base_url.rstrip('/')
         
+        # Ensure we have the version prefix
+        if "/v1" not in base:
+            base = f"{base}/v1beta"
+            
         # Ensure we construct the correct native URL: base/models/{model}:batchEmbedContents
         if ":batchEmbedContents" in base:
             url = base
