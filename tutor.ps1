@@ -199,23 +199,35 @@ if ($trigger_setup) {
             Write-Host "`nStep 2: Configure The Librarian (Embedding)" -ForegroundColor White -Style Bold
             Write-Host "Choose your AI provider for reading documents:"
             Write-Host "  1) Same as The Brain" -Style Bold
-            Write-Host "  2) Gemini"
-            Write-Host "  3) OpenAI"
+            Write-Host "  2) Gemini (text-embedding-004)"
+            Write-Host "  3) OpenAI (text-embedding-3-large)"
             Write-Host "  4) Cohere"
             Write-Host "  5) Ollama (Local)`n"
             
             $l_choice = Read-Host "Selection"
-            $default_dim = if ($b_binding -eq "gemini") { "768" } else { "3072" }
-
-            $l_binding = ""; $l_host = ""; $l_key = ""; $l_dim = ""
+            $l_binding = ""; $l_host = ""; $l_key = ""; $l_dim = ""; $l_model = ""
 
             switch ($l_choice) {
-                "1" { $l_binding = $b_binding; $l_host = $b_host; $l_key = $b_key; $l_dim = $default_dim }
-                "2" { $l_binding = "gemini"; $l_host = "https://generativelanguage.googleapis.com/v1beta/openai/"; $l_dim = "768" }
-                "3" { $l_binding = "openai"; $l_host = "https://api.openai.com/v1"; $l_dim = "3072" }
-                "4" { $l_binding = "cohere"; $l_host = "https://api.cohere.ai"; $l_dim = "1024" }
-                "5" { $l_binding = "ollama"; $l_host = "http://localhost:11434"; $l_dim = "768"; $l_key = "ollama" }
+                "1" { $l_binding = $b_binding; $l_host = $b_host; $l_key = $b_key }
+                "2" { $l_binding = "gemini"; $l_host = "https://generativelanguage.googleapis.com/v1beta" }
+                "3" { $l_binding = "openai"; $l_host = "https://api.openai.com/v1" }
+                "4" { $l_binding = "cohere"; $l_host = "https://api.cohere.ai" }
+                "5" { $l_binding = "ollama"; $l_host = "http://localhost:11434"; $l_key = "ollama" }
                 Default { Write-Host "Skipping Librarian setup..." }
+            }
+
+            # Refine Gemini host: Librarian needs native v1beta, not /openai/ suffix
+            if ($l_binding -eq "gemini") {
+                $l_host = "https://generativelanguage.googleapis.com/v1beta"
+            }
+
+            if ($l_binding -ne "") {
+                switch ($l_binding) {
+                    "gemini" { $l_model = "text-embedding-004"; $l_dim = "768" }
+                    "openai" { $l_model = "text-embedding-3-large"; $l_dim = "3072" }
+                    "cohere" { $l_model = "embed-v4.0"; $l_dim = "1024" }
+                    "ollama" { $l_model = "nomic-embed-text"; $l_dim = "768" }
+                }
             }
 
             if ($l_binding -ne "" -and $l_choice -ne "1" -and $l_binding -ne "ollama") {

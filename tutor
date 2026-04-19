@@ -241,12 +241,17 @@ if [ "$TRIGGER_SETUP" = true ]; then
 
             case $LIB_CHOICE in
                 1) L_BINDING=$B_BINDING; L_HOST=$B_HOST; L_KEY=$B_KEY ;;
-                2) L_BINDING="gemini"; L_HOST="https://generativelanguage.googleapis.com/v1beta/openai/" ;;
+                2) L_BINDING="gemini"; L_HOST="https://generativelanguage.googleapis.com/v1beta" ;;
                 3) L_BINDING="openai"; L_HOST="https://api.openai.com/v1" ;;
                 4) L_BINDING="cohere"; L_HOST="https://api.cohere.ai" ;;
                 5) L_BINDING="ollama"; L_HOST="http://localhost:11434"; L_KEY="ollama" ;;
                 *) L_BINDING=""; echo "Skipping Librarian setup..." ;;
             esac
+
+            # Refine Gemini host: Librarian needs native v1beta, not /openai/ suffix
+            if [ "$L_BINDING" == "gemini" ]; then
+                L_HOST="https://generativelanguage.googleapis.com/v1beta"
+            fi
 
             L_MODEL=""; L_DIM=""
             if [ -n "$L_BINDING" ]; then
