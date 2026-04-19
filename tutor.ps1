@@ -176,10 +176,12 @@ if ($trigger_setup) {
     if ($b_choice -eq "0") {
         Write-Host "Starting DeepTutor..."
     } else {
-        $b_binding = ""; $b_host = ""; $b_key_url = ""; $b_env = ""
+        $b_binding = ""; $b_host = ""; $b_key_url = ""; $b_env = ""; $b_model = ""
 
         switch ($b_choice) {
-            "1" { $b_binding = "gemini"; $b_host = "https://generativelanguage.googleapis.com/v1beta/openai/"; $b_key_url = "https://aistudio.google.com/app/apikey"; $b_env = "GEMINI_API_KEY" }
+            "1" { 
+                $b_binding = "gemini"; $b_host = "https://generativelanguage.googleapis.com/v1beta/openai/"; $b_key_url = "https://aistudio.google.com/app/apikey"; $b_env = "GEMINI_API_KEY"; $b_model = "gemini-1.5-flash"
+ }
             "2" { $b_binding = "openai"; $b_host = "https://api.openai.com/v1"; $b_key_url = "https://platform.openai.com/api-keys"; $b_env = "OPENAI_API_KEY" }
             "3" { $b_binding = "anthropic"; $b_host = "https://api.anthropic.com/v1"; $b_key_url = "https://console.anthropic.com/settings/keys"; $b_env = "ANTHROPIC_API_KEY" }
             "4" { $b_binding = "deepseek"; $b_host = "https://api.deepseek.com"; $b_key_url = "https://platform.deepseek.com/api_keys"; $b_env = "DEEPSEEK_API_KEY" }

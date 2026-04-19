@@ -191,6 +191,7 @@ if [ "$TRIGGER_SETUP" = true ]; then
         case $BRAIN_CHOICE in
             1)
                 B_BINDING="gemini"; B_HOST="https://generativelanguage.googleapis.com/v1beta/openai/"; B_KEY_URL="https://aistudio.google.com/app/apikey"; B_ENV="GEMINI_API_KEY"
+
                 echo -e "\nChoose model grade:"
                 echo -e "  1) ${GREEN}Standard${NC} (Gemini 1.5 Flash - Free & Fast)"
                 echo -e "  2) ${BLUE}Power${NC} (Gemini 1.5 Pro - Smarter)"
