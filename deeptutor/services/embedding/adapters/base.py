@@ -101,6 +101,16 @@ class BaseEmbeddingAdapter(ABC):
         """
         pass
 
+    async def negotiate(self) -> Dict[str, Any]:
+        """
+        Negotiate embedding capabilities with the provider.
+        Probes the API to find available models and their dimensions.
+        """
+        return {
+            "model": self.model or "",
+            "dimensions": self.dimensions or 0
+        }
+
     @abstractmethod
     def get_model_info(self) -> Dict[str, Any]:
         """

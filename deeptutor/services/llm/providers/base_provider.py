@@ -62,6 +62,13 @@ class BaseLLMProvider(ABC):
         """Run a completion call for the provider."""
         raise NotImplementedError
 
+    async def negotiate(self) -> dict[str, object]:
+        """
+        Negotiate model capabilities with the provider API.
+        Probes the API to find available models and returns the best-fit configuration.
+        """
+        return {"model": self.config.model or ""}
+
     def stream(self, prompt: str, **kwargs: object) -> AsyncStreamGenerator:
         """Return an async generator for streaming completions."""
         raise NotImplementedError

@@ -236,6 +236,45 @@ class OpenAICompatibleEmbeddingAdapter(BaseEmbeddingAdapter):
             usage=data.get("usage", {}) if isinstance(data, dict) else {},
         )
 
+    async def negotiate(self) -> Dict[str, Any]:
+        """Probes the OpenAI API to find available models."""
+        headers = {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
+        url = f"{self.base_url.rstrip('/')}/models"
+        
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(url, headers=headers)
+                if response.status_code == 200:
+                    data = response.json()
+                    models = [m["id"] for m in data.get("data", []) if "embedding" in m["id"].lower()]
+                    
+                    if not models:
+                        return {"model": self.model, "dimensions": self.dimensions}
+
+                    # Rank models
+                    best_model = None
+                    for name in ["text-embedding-3-large", "text-embedding-3-small", "text-embedding-ada-002"]:
+                        if name in models:
+                            best_model = name
+                            break
+                    
+                    if not best_model:
+                        best_model = models[0]
+                    
+                    # Resolve dimensions
+                    info = self.MODELS_INFO.get(best_model, {})
+                    dims = info.get("default", 3072) if isinstance(info, dict) else (info or 3072)
+                    
+                    return {
+                        "model": best_model,
+                        "dimensions": dims,
+                        "provider": "openai_compatible"
+                    }
+        except Exception:
+            pass
+            
+        return {"model": self.model, "dimensions": self.dimensions}
+
     def get_model_info(self) -> Dict[str, Any]:
         model_info = self.MODELS_INFO.get(self.model, self.dimensions)
 
