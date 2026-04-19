@@ -213,7 +213,7 @@ if ($trigger_setup) {
 
             switch ($l_choice) {
                 "1" { $l_binding = $b_binding; $l_host = $b_host; $l_key = $b_key }
-                "2" { $l_binding = "gemini"; $l_host = "https://generativelanguage.googleapis.com/v1beta" }
+                "2" { $l_binding = "gemini"; $l_host = "https://generativelanguage.googleapis.com" }
                 "3" { $l_binding = "openai"; $l_host = "https://api.openai.com/v1" }
                 "4" { $l_binding = "mistral"; $l_host = "https://api.mistral.ai/v1" }
                 "5" { $l_binding = "voyage"; $l_host = "https://api.voyageai.com/v1" }
@@ -224,12 +224,12 @@ if ($trigger_setup) {
 
             # Refine Gemini host: Librarian needs native v1beta, not /openai/ suffix
             if ($l_binding -eq "gemini") {
-                $l_host = "https://generativelanguage.googleapis.com/v1beta"
+                $l_host = "https://generativelanguage.googleapis.com"
             }
 
             if ($l_binding -ne "") {
                 switch ($l_binding) {
-                    "gemini" { $l_model = "text-embedding-004"; $l_dim = "768" }
+                    "gemini" { $l_model = "gemini-embedding-001"; $l_dim = "3072" }
                     "openai" { $l_model = "text-embedding-3-large"; $l_dim = "3072" }
                     "mistral" { $l_model = "mistral-embed"; $l_dim = "1024" }
                     "voyage" { $l_model = "voyage-3"; $l_dim = "1024" }

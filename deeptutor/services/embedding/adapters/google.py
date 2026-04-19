@@ -14,83 +14,55 @@ class GoogleEmbeddingAdapter(BaseEmbeddingAdapter):
     """
     Adapter for Google Generative AI (Gemini) embedding models.
     
-    API docs: https://ai.google.dev/api/rest/v1beta/models/batchEmbedContents
+    API docs: https://ai.google.dev/api/rest/v1beta/models/embedContent
     """
 
     async def embed(self, request: EmbeddingRequest) -> EmbeddingResponse:
-        # Google native endpoint for batch embeddings:
-        # POST https://generativelanguage.googleapis.com/v1beta/models/{model}:batchEmbedContents
-        
         model = request.model or self.model
         if not model:
-            model = "text-embedding-004"
+            model = "gemini-embedding-001"
             
-        base = self.base_url.rstrip('/')
-        
-        # Ensure we have the version prefix
-        if "/v1" not in base:
-            base = f"{base}/v1beta"
-            
-        # Ensure we construct the correct native URL: base/models/{model}:batchEmbedContents
-        if ":batchEmbedContents" in base:
-            url = base
-        else:
-            # Strip trailing /models if user accidentally included it in base
-            base = base.replace("/models", "")
-            url = f"{base}/models/{model}:batchEmbedContents"
-
-        # Handle API key. Google native uses 'x-goog-api-key' header or 'key' query param.
-        headers = {
-            "Content-Type": "application/json",
-            "x-goog-api-key": self.api_key
-        }
-        headers.update({str(k): str(v) for k, v in self.extra_headers.items()})
-
-        # Google schema: {"requests": [{"model": "models/...", "content": {"parts": [{"text": "..."}]}}]}
-        # For simplicity, we use the model name provided or default
+        # Clean model name - ensure it has the models/ prefix
         full_model_name = f"models/{model}" if not model.startswith("models/") else model
         
-        payload = {
-            "requests": [
-                {
-                    "model": full_model_name,
-                    "content": {"parts": [{"text": text}]}
-                } for text in request.texts
-            ]
-        }
-
-        timeout = httpx.Timeout(
-            connect=10.0,
-            read=max(self.request_timeout, 60),
-            write=10.0,
-            pool=10.0,
-        )
-
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            response = await client.post(url, json=payload, headers=headers)
-            if response.status_code >= 400:
-                logger.error(f"Google Embedding HTTP {response.status_code}: {response.text}")
-            response.raise_for_status()
-            data = response.json()
-
-        # Extract embeddings from Google response
-        # Schema: {"embeddings": [{"values": [...]}, ...]}
-        try:
-            vectors = [item["values"] for item in data.get("embeddings", [])]
-        except (KeyError, TypeError) as exc:
-            keys = list(data.keys()) if isinstance(data, dict) else "not-a-dict"
-            raise ValueError(f"Failed to parse Google embedding response. Keys={keys}") from exc
-
-        if not vectors:
-            raise ValueError("Google embedding response parsed but no vectors found.")
-
-        actual_dims = len(vectors[0])
+        # Use the absolute root to avoid any path doubling issues
+        # Endpoint: POST https://generativelanguage.googleapis.com/v1beta/{model}:embedContent?key={api_key}
+        url = f"https://generativelanguage.googleapis.com/v1beta/{full_model_name}:embedContent"
         
+        params = {"key": self.api_key}
+        headers = {"Content-Type": "application/json"}
+        headers.update({str(k): str(v) for k, v in self.extra_headers.items()})
+
+        embeddings = []
+        timeout = httpx.Timeout(connect=10.0, read=max(self.request_timeout, 60), write=10.0, pool=10.0)
+        
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            for text in request.texts:
+                # Payload for singular :embedContent
+                payload = {
+                    "content": {
+                        "parts": [{"text": text}]
+                    }
+                }
+                
+                response = await client.post(url, json=payload, params=params, headers=headers)
+                
+                if response.status_code != 200:
+                    logger.error(f"Google Embedding Error {response.status_code}: {response.text}")
+                    # Try a fallback to 'v1' if 'v1beta' failed
+                    if response.status_code == 404:
+                        url_v1 = url.replace("/v1beta/", "/v1/")
+                        response = await client.post(url_v1, json=payload, params=params, headers=headers)
+                
+                response.raise_for_status()
+                data = response.json()
+                embeddings.append(data["embedding"]["values"])
+
         return EmbeddingResponse(
-            embeddings=vectors,
+            embeddings=embeddings,
             model=model,
-            dimensions=actual_dims,
-            usage={} # Google doesn't provide detailed usage in this response usually
+            dimensions=len(embeddings[0]) if embeddings else 0,
+            usage={}
         )
 
     def get_model_info(self) -> Dict[str, Any]:

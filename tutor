@@ -255,13 +255,13 @@ if [ "$TRIGGER_SETUP" = true ]; then
 
             # Refine Gemini host: Librarian needs native v1beta, not /openai/ suffix
             if [ "$L_BINDING" == "gemini" ]; then
-                L_HOST="https://generativelanguage.googleapis.com/v1beta"
+                L_HOST="https://generativelanguage.googleapis.com"
             fi
 
             L_MODEL=""; L_DIM=""
             if [ -n "$L_BINDING" ]; then
                 case $L_BINDING in
-                    gemini) L_MODEL="text-embedding-004"; L_DIM="768" ;;
+                    gemini) L_MODEL="gemini-embedding-001"; L_DIM="3072" ;;
                     openai) L_MODEL="text-embedding-3-large"; L_DIM="3072" ;;
                     mistral) L_MODEL="mistral-embed"; L_DIM="1024" ;;
                     voyage) L_MODEL="voyage-3"; L_DIM="1024" ;;
