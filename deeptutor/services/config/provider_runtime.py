@@ -43,8 +43,6 @@ SEARCH_ENV_FALLBACK = {
 LLM_LOCALHOST_PROVIDERS = ("ollama", "vllm")
 
 EMBEDDING_PROVIDER_ALIASES = {
-    "google": "openai",
-    "gemini": "openai",
     "huggingface": "custom",
     "lm_studio": "vllm",
     "llama_cpp": "vllm",
