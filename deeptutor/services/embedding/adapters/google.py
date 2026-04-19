@@ -26,15 +26,14 @@ class GoogleEmbeddingAdapter(BaseEmbeddingAdapter):
             model = "text-embedding-004"
             
         base = self.base_url.rstrip('/')
-        # Ensure we are at the models root
-        if "/models" not in base and not base.endswith("/v1beta") and not base.endswith("/v1"):
-             url = f"{base}/models/{model}:batchEmbedContents"
+        
+        # Ensure we construct the correct native URL: base/models/{model}:batchEmbedContents
+        if ":batchEmbedContents" in base:
+            url = base
         else:
-             # If user already provided a full path, or just the base
-             if ":batchEmbedContents" in base:
-                 url = base
-             else:
-                 url = f"{base}/{model}:batchEmbedContents"
+            # Strip trailing /models if user accidentally included it in base
+            base = base.replace("/models", "")
+            url = f"{base}/models/{model}:batchEmbedContents"
 
         # Handle API key. Google native uses 'x-goog-api-key' header or 'key' query param.
         headers = {
