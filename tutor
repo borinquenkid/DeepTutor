@@ -231,10 +231,12 @@ if [ "$TRIGGER_SETUP" = true ]; then
             echo -e "\n${BOLD}Step 2: Configure The Librarian (Embedding)${NC}"
             echo -e "Choose your AI provider for reading documents:"
             echo -e "  1) ${BOLD}Same as The Brain${NC}"
-            echo -e "  2) Gemini (text-embedding-004)"
-            echo -e "  3) OpenAI (text-embedding-3-large)"
-            echo -e "  4) Cohere"
-            echo -e "  5) Ollama (Local)"
+            echo -e "  2) Gemini"
+            echo -e "  3) OpenAI"
+            echo -e "  4) Mistral"
+            echo -e "  5) Voyage AI"
+            echo -e "  6) Cohere"
+            echo -e "  7) Ollama (Local)"
             
             printf "${BOLD}Selection: ${NC}"
             read -r LIB_CHOICE
@@ -243,8 +245,10 @@ if [ "$TRIGGER_SETUP" = true ]; then
                 1) L_BINDING=$B_BINDING; L_HOST=$B_HOST; L_KEY=$B_KEY ;;
                 2) L_BINDING="gemini"; L_HOST="https://generativelanguage.googleapis.com/v1beta" ;;
                 3) L_BINDING="openai"; L_HOST="https://api.openai.com/v1" ;;
-                4) L_BINDING="cohere"; L_HOST="https://api.cohere.ai" ;;
-                5) L_BINDING="ollama"; L_HOST="http://localhost:11434"; L_KEY="ollama" ;;
+                4) L_BINDING="mistral"; L_HOST="https://api.mistral.ai/v1" ;;
+                5) L_BINDING="voyage"; L_HOST="https://api.voyageai.com/v1" ;;
+                6) L_BINDING="cohere"; L_HOST="https://api.cohere.ai" ;;
+                7) L_BINDING="ollama"; L_HOST="http://localhost:11434"; L_KEY="ollama" ;;
                 *) L_BINDING=""; echo "Skipping Librarian setup..." ;;
             esac
 
@@ -258,6 +262,8 @@ if [ "$TRIGGER_SETUP" = true ]; then
                 case $L_BINDING in
                     gemini) L_MODEL="text-embedding-004"; L_DIM="768" ;;
                     openai) L_MODEL="text-embedding-3-large"; L_DIM="3072" ;;
+                    mistral) L_MODEL="mistral-embed"; L_DIM="1024" ;;
+                    voyage) L_MODEL="voyage-3"; L_DIM="1024" ;;
                     cohere) L_MODEL="embed-v4.0"; L_DIM="1024" ;;
                     ollama) L_MODEL="nomic-embed-text"; L_DIM="768" ;;
                 esac

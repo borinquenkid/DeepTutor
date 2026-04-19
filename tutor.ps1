@@ -199,10 +199,12 @@ if ($trigger_setup) {
             Write-Host "`nStep 2: Configure The Librarian (Embedding)" -ForegroundColor White -Style Bold
             Write-Host "Choose your AI provider for reading documents:"
             Write-Host "  1) Same as The Brain" -Style Bold
-            Write-Host "  2) Gemini (text-embedding-004)"
-            Write-Host "  3) OpenAI (text-embedding-3-large)"
-            Write-Host "  4) Cohere"
-            Write-Host "  5) Ollama (Local)`n"
+            Write-Host "  2) Gemini"
+            Write-Host "  3) OpenAI"
+            Write-Host "  4) Mistral"
+            Write-Host "  5) Voyage AI"
+            Write-Host "  6) Cohere"
+            Write-Host "  7) Ollama (Local)`n"
             
             $l_choice = Read-Host "Selection"
             $l_binding = ""; $l_host = ""; $l_key = ""; $l_dim = ""; $l_model = ""
@@ -211,8 +213,10 @@ if ($trigger_setup) {
                 "1" { $l_binding = $b_binding; $l_host = $b_host; $l_key = $b_key }
                 "2" { $l_binding = "gemini"; $l_host = "https://generativelanguage.googleapis.com/v1beta" }
                 "3" { $l_binding = "openai"; $l_host = "https://api.openai.com/v1" }
-                "4" { $l_binding = "cohere"; $l_host = "https://api.cohere.ai" }
-                "5" { $l_binding = "ollama"; $l_host = "http://localhost:11434"; $l_key = "ollama" }
+                "4" { $l_binding = "mistral"; $l_host = "https://api.mistral.ai/v1" }
+                "5" { $l_binding = "voyage"; $l_host = "https://api.voyageai.com/v1" }
+                "6" { $l_binding = "cohere"; $l_host = "https://api.cohere.ai" }
+                "7" { $l_binding = "ollama"; $l_host = "http://localhost:11434"; $l_key = "ollama" }
                 Default { Write-Host "Skipping Librarian setup..." }
             }
 
@@ -225,6 +229,8 @@ if ($trigger_setup) {
                 switch ($l_binding) {
                     "gemini" { $l_model = "text-embedding-004"; $l_dim = "768" }
                     "openai" { $l_model = "text-embedding-3-large"; $l_dim = "3072" }
+                    "mistral" { $l_model = "mistral-embed"; $l_dim = "1024" }
+                    "voyage" { $l_model = "voyage-3"; $l_dim = "1024" }
                     "cohere" { $l_model = "embed-v4.0"; $l_dim = "1024" }
                     "ollama" { $l_model = "nomic-embed-text"; $l_dim = "768" }
                 }

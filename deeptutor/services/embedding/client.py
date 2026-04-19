@@ -9,6 +9,7 @@ from deeptutor.services.config.provider_runtime import EMBEDDING_PROVIDERS
 
 from .adapters.base import BaseEmbeddingAdapter, EmbeddingRequest
 from .adapters.cohere import CohereEmbeddingAdapter
+from .adapters.google import GoogleEmbeddingAdapter
 from .adapters.jina import JinaEmbeddingAdapter
 from .adapters.ollama import OllamaEmbeddingAdapter
 from .adapters.openai_compatible import OpenAICompatibleEmbeddingAdapter
@@ -16,6 +17,7 @@ from .config import EmbeddingConfig, get_embedding_config
 
 _ADAPTER_MAP: dict[str, type[BaseEmbeddingAdapter]] = {
     "openai_compat": OpenAICompatibleEmbeddingAdapter,
+    "google": GoogleEmbeddingAdapter,
     "cohere": CohereEmbeddingAdapter,
     "jina": JinaEmbeddingAdapter,
     "ollama": OllamaEmbeddingAdapter,

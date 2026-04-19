@@ -78,8 +78,8 @@ EMBEDDING_PROVIDERS: dict[str, EmbeddingProviderSpec] = {
         default_dim=3072,
     ),
     "gemini": EmbeddingProviderSpec(
-        label="Gemini",
-        default_api_base="https://generativelanguage.googleapis.com/v1beta/openai/",
+        label="Gemini", adapter="google",
+        default_api_base="https://generativelanguage.googleapis.com/v1beta",
         keywords=("gemini", "google"),
         is_local=False, api_key_envs=("GEMINI_API_KEY", "GOOGLE_API_KEY"),
         default_model="text-embedding-004", default_dim=768,
@@ -111,6 +111,20 @@ EMBEDDING_PROVIDERS: dict[str, EmbeddingProviderSpec] = {
         api_key_envs=("JINA_API_KEY",),
         default_model="jina-embeddings-v3",
         default_dim=1024,
+    ),
+    "mistral": EmbeddingProviderSpec(
+        label="Mistral",
+        default_api_base="https://api.mistral.ai/v1",
+        keywords=("mistral",),
+        is_local=False, api_key_envs=("MISTRAL_API_KEY",),
+        default_model="mistral-embed", default_dim=1024,
+    ),
+    "voyage": EmbeddingProviderSpec(
+        label="Voyage AI",
+        default_api_base="https://api.voyageai.com/v1",
+        keywords=("voyage",),
+        is_local=False, api_key_envs=("VOYAGE_API_KEY",),
+        default_model="voyage-3", default_dim=1024,
     ),
     "ollama": EmbeddingProviderSpec(
         label="Ollama",
