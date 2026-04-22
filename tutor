@@ -14,6 +14,7 @@ YELLOW='\033[38;5;214m'
 RED='\033[38;5;203m'
 BOLD='\033[1m'
 NC='\033[0m'
+dim() { echo -e "\033[2m$1\033[0m"; }
 
 # Helpers
 log_info() { echo -e "${BLUE}ℹ️  $1${NC}"; }
@@ -21,58 +22,12 @@ log_success() { echo -e "${GREEN}✅ $1${NC}"; }
 log_warn() { echo -e "${YELLOW}⚠️  $1${NC}"; }
 log_error() { echo -e "${RED}❌ $1${NC}"; }
 
-# Frictionless Ollama Setup
-ensure_ollama() {
-    echo -e "${BLUE}🔍 Checking Librarian (Ollama)...${NC}"
-    
-    if ! command -v ollama &> /dev/null; then
-        echo -e "${YELLOW}⚠️  Ollama not found. Attempting frictionless install...${NC}"
-        if [[ "$OSTYPE" == "darwin"* ]]; then
-            log_info "Downloading Ollama for Mac..."
-            curl -L https://ollama.com/download/Ollama-darwin.zip -o ollama.zip
-            unzip -q ollama.zip -d /Applications
-            rm ollama.zip
-            log_success "Ollama installed to /Applications."
-        else
-            curl -fsSL https://ollama.com/install.sh | sh
-        fi
-    fi
-
-    # Check if running
-    if ! curl -s http://localhost:11434/api/tags &> /dev/null; then
-        log_info "Ollama is not running. Starting it in background..."
-        # Prefer starting the server directly to avoid popping up the GUI app
-        if command -v ollama &> /dev/null; then
-            ollama serve > /dev/null 2>&1 &
-            # Give it a moment to bind to the port
-            for i in {1..10}; do
-                if curl -s http://localhost:11434/api/tags &> /dev/null; then
-                    break
-                fi
-                sleep 1
-            done
-        elif [[ "$OSTYPE" == "darwin"* ]]; then
-            # Fallback to opening the app if the CLI serve fails or is not in path yet
-            open -a Ollama
-            sleep 5
-        fi
-    fi
-
-    # Ensure model exists
-    if ! ollama list | grep -q "nomic-embed-text"; then
-        log_info "Pulling Librarian model (nomic-embed-text)..."
-        ollama pull nomic-embed-text
-    fi
-    log_success "Librarian is ready."
-}
-
 # 1. Check Git
 check_git() {
     if ! command -v git >/dev/null 2>&1; then
         log_warn "Git is not installed."
         if [[ "$OSTYPE" == "darwin"* ]]; then
             log_info "Attempting to install Git via xcode-select..."
-            # xcode-select --install is interactive, but it's the right way on Mac
             xcode-select --install || true
         elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
             if command -v apt-get >/dev/null 2>&1; then
@@ -85,7 +40,6 @@ check_git() {
         fi
     fi
 
-    # If still not found, we can't do much more automatically
     if ! command -v git >/dev/null 2>&1; then
         log_error "Git is still not found. Some features might be limited."
     elif [ ! -d ".git" ]; then
@@ -100,8 +54,6 @@ check_git() {
         log_info "Checking for updates..."
         git fetch origin -q &
         FETCH_PID=$!
-        
-        # Give it a short timeout (3s) to not hang the boot
         ( sleep 3; kill $FETCH_PID 2>/dev/null ) &
         wait $FETCH_PID 2>/dev/null || true
 
@@ -113,9 +65,7 @@ check_git() {
         if [ "$LOCAL" = "$REMOTE" ]; then
             log_success "DeepTutor is up to date."
         elif [ "$LOCAL" = "$BASE" ]; then
-            log_warn "Updates are available!"
-            echo -e "  Run ${BOLD}git pull${NC} to update to the latest version."
-            # We could offer to pull automatically here if we want to be aggressive
+            log_warn "Updates are available! Run 'git pull' to update."
         fi
     fi
 }
@@ -128,7 +78,6 @@ find_python() {
     for cmd in python3.12 python3.11 python3 python; do
         if command -v "$cmd" >/dev/null 2>&1; then
             version=$("$cmd" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null || echo "0.0")
-            # Simple version comparison: if $version >= $MIN_PYTHON
             if [[ "$version" == "$MIN_PYTHON" ]] || [[ "$version" > "$MIN_PYTHON" ]]; then
                 echo "$cmd"
                 return 0
@@ -142,14 +91,13 @@ PYTHON_CMD=$(find_python)
 
 if [ -z "$PYTHON_CMD" ]; then
     log_warn "Python ${MIN_PYTHON}+ not found."
-    
     if [[ "$OSTYPE" == "darwin"* ]]; then
         if command -v brew >/dev/null 2>&1; then
             log_info "Attempting to install Python 3.11 via Homebrew..."
             brew install python@3.11
             PYTHON_CMD=$(find_python)
         else
-            log_error "Homebrew not found. Please install Python 3.11 manually from https://python.org"
+            log_error "Homebrew not found. Please install Python 3.11 manually."
             exit 1
         fi
     elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
@@ -157,26 +105,21 @@ if [ -z "$PYTHON_CMD" ]; then
             log_info "Attempting to install Python 3.11 via apt-get..."
             sudo apt-get update && sudo apt-get install -y python3.11 python3.11-venv
             PYTHON_CMD=$(find_python)
-        else
-            log_error "Supported package manager not found. Please install Python 3.11 manually."
-            exit 1
         fi
     fi
 fi
 
 if [ -z "$PYTHON_CMD" ]; then
-    log_error "Failed to automatically install Python ${MIN_PYTHON}+."
-    log_info "Please install it from https://python.org or your package manager."
+    log_error "DeepTutor requires Python ${MIN_PYTHON}+."
     exit 1
 fi
 
-# 2. Virtual Environment
+# 3. Virtual Environment
 if [ ! -d "$VENV_DIR" ]; then
-    log_info "Creating virtual environment in ${VENV_DIR}..."
+    log_info "Creating virtual environment..."
     "$PYTHON_CMD" -m venv "$VENV_DIR"
     log_success "Environment created."
     
-    # Resolve internal Python for initial install
     if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" || "$OSTYPE" == "cygwin" ]]; then
         INTERNAL_PYTHON="$VENV_DIR/Scripts/python.exe"
     else
@@ -190,7 +133,6 @@ if [ ! -d "$VENV_DIR" ]; then
     log_success "Dependencies installed."
 fi
 
-# 3. Resolve internal Python
 if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" || "$OSTYPE" == "cygwin" ]]; then
     PYTHON_EXE="$VENV_DIR/Scripts/python.exe"
 else
@@ -198,31 +140,16 @@ else
 fi
 
 # 4. Interactive Configuration
-# If .env doesn't exist, or has empty config, or the tour hasn't been finalized, trigger setup
 TRIGGER_SETUP=false
-if [ ! -f ".env" ] || ! grep -q "LLM_API_KEY=." .env || [ ! -f "data/user/settings/model_catalog.json" ]; then
+if [ ! -f ".env" ] || ! grep -q "LLM_API_KEY=." .env || [ ! -f "data/settings/model_catalog.json" ]; then
     TRIGGER_SETUP=true
 fi
 
-# Allow forcing setup with --setup flag
 if [ "$1" == "--setup" ]; then TRIGGER_SETUP=true; fi
-
-# If already configured, ask if they want to reconfigure
-if [ "$TRIGGER_SETUP" = false ]; then
-    echo -e "\n${BOLD}🚀 DeepTutor is ready!${NC}"
-    echo -e "  - Press ${BOLD}Enter${NC} to start."
-    echo -e "  - Type ${YELLOW}'r'${NC} to reconfigure/reset settings."
-    printf "${BOLD}Choice: ${NC}"
-    read -r READY_CHOICE
-    if [[ "$READY_CHOICE" == "r" || "$READY_CHOICE" == "R" ]]; then
-        TRIGGER_SETUP=true
-    fi
-fi
 
 if [ "$TRIGGER_SETUP" = true ]; then
     echo -e "\n${BOLD}🔑 DeepTutor Setup${NC}"
     
-    # If we already have a .env, offer to just start
     if [ -f ".env" ] && grep -q "LLM_API_KEY=." .env; then
         echo -e "  0) ${GREEN}${BOLD}🚀 Start DeepTutor Now${NC} (Use existing config)"
     fi
@@ -238,7 +165,7 @@ if [ "$TRIGGER_SETUP" = true ]; then
     echo -e "  6) ${GREEN}NVIDIA NIM${NC} (Free - 80+ Models)"
     echo -e "  7) Ollama (Local)"
     echo -e "  s) Skip / Continue to Server\n"
-
+    
     printf "${BOLD}Selection: ${NC}"
     read -r BRAIN_CHOICE
 
@@ -247,30 +174,9 @@ if [ "$TRIGGER_SETUP" = true ]; then
     else
         B_MODEL=""
         case $BRAIN_CHOICE in
-            1)
-                B_BINDING="gemini"; B_HOST="https://generativelanguage.googleapis.com/v1beta/openai/"; B_KEY_URL="https://aistudio.google.com/app/apikey"; B_ENV="GEMINI_API_KEY"
-                echo -e "\nChoose model grade:"
-                echo -e "  1) ${GREEN}Standard${NC} (Gemini 1.5 Flash - Free & Fast)"
-                echo -e "  2) ${BLUE}Power${NC} (Gemini 1.5 Pro - Smarter)"
-                printf "${BOLD}Selection [1]: ${NC}"; read -r M_GRADE
-                [ "$M_GRADE" == "2" ] && B_MODEL="gemini-1.5-pro" || B_MODEL="gemini-1.5-flash"
-                ;;
-            2)
-                B_BINDING="openai"; B_HOST="https://api.openai.com/v1"; B_KEY_URL="https://platform.openai.com/api-keys"; B_ENV="OPENAI_API_KEY"
-                echo -e "\nChoose model grade:"
-                echo -e "  1) ${GREEN}Standard${NC} (GPT-4o-mini - Cheap & Fast)"
-                echo -e "  2) ${BLUE}Power${NC} (GPT-4o - Smarter)"
-                printf "${BOLD}Selection [1]: ${NC}"; read -r M_GRADE
-                [ "$M_GRADE" == "2" ] && B_MODEL="gpt-4o" || B_MODEL="gpt-4o-mini"
-                ;;
-            3)
-                B_BINDING="anthropic"; B_HOST="https://api.anthropic.com/v1"; B_KEY_URL="https://console.anthropic.com/settings/keys"; B_ENV="ANTHROPIC_API_KEY"
-                echo -e "\nChoose model grade:"
-                echo -e "  1) ${GREEN}Standard${NC} (Claude 3.5 Haiku)"
-                echo -e "  2) ${BLUE}Power${NC} (Claude 3.5 Sonnet)"
-                printf "${BOLD}Selection [1]: ${NC}"; read -r M_GRADE
-                [ "$M_GRADE" == "2" ] && B_MODEL="claude-3-5-sonnet-latest" || B_MODEL="claude-3-5-haiku-latest"
-                ;;
+            1) B_BINDING="gemini"; B_HOST="https://generativelanguage.googleapis.com/v1beta/openai/"; B_KEY_URL="https://aistudio.google.com/app/apikey"; B_ENV="GEMINI_API_KEY"; B_MODEL="gemini-1.5-flash" ;;
+            2) B_BINDING="openai"; B_HOST="https://api.openai.com/v1"; B_KEY_URL="https://platform.openai.com/api-keys"; B_ENV="OPENAI_API_KEY"; B_MODEL="gpt-4o-mini" ;;
+            3) B_BINDING="anthropic"; B_HOST="https://api.anthropic.com/v1"; B_KEY_URL="https://console.anthropic.com/settings/keys"; B_ENV="ANTHROPIC_API_KEY"; B_MODEL="claude-3-5-sonnet-latest" ;;
             4) B_BINDING="deepseek"; B_HOST="https://api.deepseek.com"; B_KEY_URL="https://platform.deepseek.com/api_keys"; B_ENV="DEEPSEEK_API_KEY"; B_MODEL="deepseek-chat" ;;
             5) B_BINDING="groq"; B_HOST="https://api.groq.com/openai/v1"; B_KEY_URL="https://console.groq.com/keys"; B_ENV="GROQ_API_KEY"; B_MODEL="llama-3.3-70b-versatile" ;;
             6) 
@@ -278,7 +184,7 @@ if [ "$TRIGGER_SETUP" = true ]; then
                 echo -e "\nChoose model grade:"
                 echo -e "  1) ${GREEN}Standard${NC} (Llama-3.1-70B)"
                 echo -e "  2) ${BLUE}Power${NC} (Llama-3.1-405B - Best)"
-                echo -e "  3) ${NC}DeepSeek-V3${NC}"
+                echo -e "  3) DeepSeek-V3"
                 printf "${BOLD}Selection [1]: ${NC}"; read -r M_GRADE
                 if [ "$M_GRADE" == "2" ]; then B_MODEL="nvidia/llama-3.1-405b-instruct"; elif [ "$M_GRADE" == "3" ]; then B_MODEL="deepseek/deepseek-v3"; else B_MODEL="nvidia/llama-3.1-70b-instruct"; fi
                 ;;
@@ -286,78 +192,43 @@ if [ "$TRIGGER_SETUP" = true ]; then
             *) echo "Skipping configuration..."; B_BINDING="" ;;
         esac
 
-
         if [ -n "$B_BINDING" ]; then
             B_KEY="ollama"
             if [ "$B_BINDING" != "ollama" ]; then
                 echo -e "\n${BOLD}🔑 Get your $B_BINDING API Key at:${NC} ${BLUE}$B_KEY_URL${NC}"
-                
-                # Frictionless: attempt to open the browser
-                if [[ "$OSTYPE" == "darwin"* ]]; then
-                    open "$B_KEY_URL" 2>/dev/null || true
-                elif command -v xdg-open &> /dev/null; then
-                    xdg-open "$B_KEY_URL" 2>/dev/null || true
-                fi
-
-                printf "${YELLOW}Paste your Brain API Key (or press Enter once you have it): ${NC}"
+                printf "${YELLOW}Paste your Brain API Key: ${NC}"
                 read -r B_KEY
-                
-                # If they just press enter without pasting, ask again more firmly
-                while [ -z "$B_KEY" ]; do
-                    log_warn "A Brain API Key is required for $B_BINDING to work."
-                    printf "${YELLOW}Paste your Brain API Key: ${NC}"
-                    read -r B_KEY
-                done
             fi
 
             # ── PHASE 2: THE LIBRARIAN ───────────────────────────────────────
             echo -e "\n${BOLD}Step 2: Configure The Librarian (Embedding)${NC}"
             echo -e "Choose your AI provider for reading documents:"
-            
-            # Recommendation for Groq/DeepSeek users
-            if [[ "$B_BINDING" == "groq" || "$B_BINDING" == "deepseek" ]]; then
-                echo -e "  ${YELLOW}Note: Your chosen Brain ($B_BINDING) does not support embeddings.${NC}"
-                echo -e "  ${GREEN}Recommended: Option 7 (Ollama) for local/free Librarian.${NC}"
-            fi
-
-            echo -e "  1) Same as The Brain (Only if Brain supports it)"
+            echo -e "  1) ${BOLD}Same as The Brain${NC}"
             echo -e "  2) Gemini"
             echo -e "  3) OpenAI"
             echo -e "  4) Mistral"
             echo -e "  5) Voyage AI"
             echo -e "  6) Cohere"
-            echo -e "  7) ${BOLD}${GREEN}Ollama (Local & Free)${NC}"
+            echo -e "  7) NVIDIA NIM (nv-embedqa-e5-v5)"
+            echo -e "  8) ${BOLD}${GREEN}Ollama (Local & Free)${NC}"
             
             printf "${BOLD}Selection: ${NC}"
             read -r LIB_CHOICE
 
             case $LIB_CHOICE in
-                1) 
-                    if [[ "$B_BINDING" == "groq" || "$B_BINDING" == "deepseek" || "$B_BINDING" == "anthropic" ]]; then
-                        log_warn "$B_BINDING does not have a Librarian service. Switching to Ollama (Local) instead."
-                        L_BINDING="ollama"; L_HOST="http://localhost:11434"; L_KEY="ollama"
-                    else
-                        L_BINDING=$B_BINDING; L_HOST=$B_HOST; L_KEY=$B_KEY
-                    fi
-                    ;;
-                2) L_BINDING="gemini"; L_HOST="https://generativelanguage.googleapis.com/v1beta" ;;
+                1) L_BINDING=$B_BINDING; L_HOST=$B_HOST; L_KEY=$B_KEY ;;
+                2) L_BINDING="gemini"; L_HOST="https://generativelanguage.googleapis.com" ;;
                 3) L_BINDING="openai"; L_HOST="https://api.openai.com/v1" ;;
                 4) L_BINDING="mistral"; L_HOST="https://api.mistral.ai/v1" ;;
                 5) L_BINDING="voyage"; L_HOST="https://api.voyageai.com/v1" ;;
                 6) L_BINDING="cohere"; L_HOST="https://api.cohere.ai" ;;
-                7) L_BINDING="ollama"; L_HOST="http://localhost:11434"; L_KEY="ollama" ;;
+                7) L_BINDING="nvidia"; L_HOST="https://integrate.api.nvidia.com/v1" ;;
+                8) L_BINDING="ollama"; L_HOST="http://localhost:11434"; L_KEY="ollama" ;;
                 *) L_BINDING=""; echo "Skipping Librarian setup..." ;;
             esac
 
-            # Refine Gemini host: Librarian needs native v1beta
-            if [ "$L_BINDING" == "gemini" ]; then
-                L_HOST="https://generativelanguage.googleapis.com/v1beta"
-            fi
-            
-            # Frictionless Ollama check
-            if [ "$L_BINDING" == "ollama" ]; then
-                ensure_ollama
-            fi
+            # Final check for Gemini host
+            if [ "$L_BINDING" == "gemini" ]; then L_HOST="https://generativelanguage.googleapis.com"; fi
 
             L_MODEL=""; L_DIM=""
             if [ -n "$L_BINDING" ]; then
@@ -367,6 +238,7 @@ if [ "$TRIGGER_SETUP" = true ]; then
                     mistral) L_MODEL="mistral-embed"; L_DIM="1024" ;;
                     voyage) L_MODEL="voyage-3"; L_DIM="1024" ;;
                     cohere) L_MODEL="embed-v4.0"; L_DIM="1024" ;;
+                    nvidia) L_MODEL="nvidia/nv-embedqa-e5-v5"; L_DIM="1024" ;;
                     ollama) L_MODEL="nomic-embed-text"; L_DIM="768" ;;
                 esac
             fi
@@ -377,37 +249,25 @@ if [ "$TRIGGER_SETUP" = true ]; then
             fi
 
             # ── PHASE 3: THE EXPLORER ────────────────────────────────────────
-
-            # ── PHASE 3: THE EXPLORER ────────────────────────────────────────
             echo -e "\n${BOLD}Step 3: Configure The Explorer (Web Search)${NC}"
             echo -e "Optional: choose a web search provider to enable real-time info:"
-            echo -e "  1) ${BLUE}Brave Search${NC} (Highly Recommended)"
-            echo -e "  2) ${YELLOW}Tavily${NC} (AI-optimized)"
+            echo -e "  1) ${BLUE}Brave Search${NC}"
+            echo -e "  2) ${YELLOW}Tavily${NC}"
             echo -e "  3) DuckDuckGo (Free - No Key Needed)"
             echo -e "  4) Perplexity"
-            echo -e "  5) Serper.dev (Google Search API)"
-            echo -e "  6) Jina Reader"
-            echo -e "  7) Exa.ai"
-            echo -e "  8) Baidu (China)"
+            echo -e "  5) Serper.dev"
             echo -e "  s) Skip\n"
             
             printf "${BOLD}Selection: ${NC}"
             read -r EXP_CHOICE
 
             E_PROV=""
-            E_URL=""
-            E_KEY=""
-
             case $EXP_CHOICE in
                 1) E_PROV="brave"; E_URL="https://api.search.brave.com/app/dashboard" ;;
                 2) E_PROV="tavily"; E_URL="https://tavily.com/dashboard" ;;
                 3) E_PROV="duckduckgo"; E_KEY="none" ;;
                 4) E_PROV="perplexity"; E_URL="https://www.perplexity.ai/settings/api" ;;
                 5) E_PROV="serper"; E_URL="https://serper.dev/dashboard" ;;
-                6) E_PROV="jina"; E_URL="https://jina.ai/reader/" ;;
-                7) E_PROV="exa"; E_URL="https://dashboard.exa.ai/" ;;
-                8) E_PROV="baidu"; E_URL="https://ziyuan.baidu.com/console/index" ;;
-                *) E_PROV="" ;;
             esac
 
             if [ -n "$E_PROV" ] && [ "$E_PROV" != "duckduckgo" ]; then
@@ -418,26 +278,13 @@ if [ "$TRIGGER_SETUP" = true ]; then
 
             # ── SAVE TO .ENV ────────────────────────────────────────────────
             [ ! -f ".env" ] && touch .env
-            CLEAN_PATTERN="^(LLM_|EMBEDDING_|SEARCH_|GEMINI_API_KEY|OPENAI_API_KEY|ANTHROPIC_API_KEY|DEEPSEEK_API_KEY|GROQ_API_KEY|MISTRAL_API_KEY|COHERE_API_KEY|BRAVE_API_KEY|TAVILY_API_KEY|PERPLEXITY_API_KEY|GOOGLE_API_KEY|SERPER_API_KEY|JINA_API_KEY|EXA_API_KEY|BAIDU_API_KEY)="
+            CLEAN_PATTERN="^(LLM_|EMBEDDING_|SEARCH_|GEMINI_API_KEY|OPENAI_API_KEY|ANTHROPIC_API_KEY|DEEPSEEK_API_KEY|GROQ_API_KEY|MISTRAL_API_KEY|COHERE_API_KEY|BRAVE_API_KEY|TAVILY_API_KEY|PERPLEXITY_API_KEY|GOOGLE_API_KEY|NVIDIA_API_KEY)="
             grep -vE "$CLEAN_PATTERN" .env > .env.tmp || true
             mv .env.tmp .env
 
             [ -n "$B_BINDING" ] && { echo "LLM_BINDING=$B_BINDING" >> .env; echo "LLM_HOST=$B_HOST" >> .env; echo "LLM_API_KEY=$B_KEY" >> .env; echo "LLM_MODEL=$B_MODEL" >> .env; [ -n "$B_ENV" ] && echo "$B_ENV=$B_KEY" >> .env; }
             [ -n "$L_BINDING" ] && { echo "EMBEDDING_BINDING=$L_BINDING" >> .env; echo "EMBEDDING_HOST=$L_HOST" >> .env; echo "EMBEDDING_API_KEY=$L_KEY" >> .env; echo "EMBEDDING_MODEL=$L_MODEL" >> .env; echo "EMBEDDING_DIMENSION=$L_DIM" >> .env; }
-
-            if [ -n "$E_PROV" ]; then
-                echo "SEARCH_PROVIDER=$E_PROV" >> .env
-                echo "SEARCH_API_KEY=$E_KEY" >> .env
-                case $E_PROV in
-                    brave) echo "BRAVE_API_KEY=$E_KEY" >> .env ;;
-                    tavily) echo "TAVILY_API_KEY=$E_KEY" >> .env ;;
-                    perplexity) echo "PERPLEXITY_API_KEY=$E_KEY" >> .env ;;
-                    serper) echo "SERPER_API_KEY=$E_KEY" >> .env ;;
-                    jina) echo "JINA_API_KEY=$E_KEY" >> .env ;;
-                    exa) echo "EXA_API_KEY=$E_KEY" >> .env ;;
-                    baidu) echo "BAIDU_API_KEY=$E_KEY" >> .env ;;
-                esac
-            fi
+            [ -n "$E_PROV" ] && { echo "SEARCH_PROVIDER=$E_PROV" >> .env; echo "SEARCH_API_KEY=$E_KEY" >> .env; }
 
             log_success "Configuration saved to .env"
         fi
@@ -446,7 +293,6 @@ if [ "$TRIGGER_SETUP" = true ]; then
 fi
 
 # 5. Clear Port Conflicts
-# Ensure ports 8001 and 3782 are free to avoid "Address already in use" crashes
 clear_port() {
     local port=$1
     if command -v lsof >/dev/null 2>&1; then
@@ -457,13 +303,8 @@ clear_port() {
         fi
     fi
 }
-
 clear_port 8001
 clear_port 3782
 
-# 6. Launch
-if [ "$TRIGGER_SETUP" = true ]; then
-    "$PYTHON_EXE" scripts/start_tour.py "$@"
-else
-    "$PYTHON_EXE" scripts/start_web.py "$@"
-fi
+# 6. Launch the Setup Tour
+"$PYTHON_EXE" scripts/start_tour.py "$@"
