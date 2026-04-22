@@ -365,6 +365,15 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
     ),
     # === Auxiliary ==========================================================
     ProviderSpec(
+        name="nvidia",
+        keywords=("nvidia",),
+        env_key="NVIDIA_API_KEY",
+        display_name="NVIDIA NIM",
+        backend="openai_compat",
+        default_api_base="https://integrate.api.nvidia.com/v1",
+        default_model="nvidia/llama-3.1-405b-instruct",
+    ),
+    ProviderSpec(
         name="groq",
         keywords=("groq",),
         env_key="GROQ_API_KEY",

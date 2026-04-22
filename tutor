@@ -21,6 +21,51 @@ log_success() { echo -e "${GREEN}✅ $1${NC}"; }
 log_warn() { echo -e "${YELLOW}⚠️  $1${NC}"; }
 log_error() { echo -e "${RED}❌ $1${NC}"; }
 
+# Frictionless Ollama Setup
+ensure_ollama() {
+    echo -e "${BLUE}🔍 Checking Librarian (Ollama)...${NC}"
+    
+    if ! command -v ollama &> /dev/null; then
+        echo -e "${YELLOW}⚠️  Ollama not found. Attempting frictionless install...${NC}"
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            log_info "Downloading Ollama for Mac..."
+            curl -L https://ollama.com/download/Ollama-darwin.zip -o ollama.zip
+            unzip -q ollama.zip -d /Applications
+            rm ollama.zip
+            log_success "Ollama installed to /Applications."
+        else
+            curl -fsSL https://ollama.com/install.sh | sh
+        fi
+    fi
+
+    # Check if running
+    if ! curl -s http://localhost:11434/api/tags &> /dev/null; then
+        log_info "Ollama is not running. Starting it in background..."
+        # Prefer starting the server directly to avoid popping up the GUI app
+        if command -v ollama &> /dev/null; then
+            ollama serve > /dev/null 2>&1 &
+            # Give it a moment to bind to the port
+            for i in {1..10}; do
+                if curl -s http://localhost:11434/api/tags &> /dev/null; then
+                    break
+                fi
+                sleep 1
+            done
+        elif [[ "$OSTYPE" == "darwin"* ]]; then
+            # Fallback to opening the app if the CLI serve fails or is not in path yet
+            open -a Ollama
+            sleep 5
+        fi
+    fi
+
+    # Ensure model exists
+    if ! ollama list | grep -q "nomic-embed-text"; then
+        log_info "Pulling Librarian model (nomic-embed-text)..."
+        ollama pull nomic-embed-text
+    fi
+    log_success "Librarian is ready."
+}
+
 # 1. Check Git
 check_git() {
     if ! command -v git >/dev/null 2>&1; then
@@ -155,12 +200,24 @@ fi
 # 4. Interactive Configuration
 # If .env doesn't exist, or has empty config, or the tour hasn't been finalized, trigger setup
 TRIGGER_SETUP=false
-if [ ! -f ".env" ] || ! grep -q "LLM_API_KEY=." .env || [ ! -f "data/settings/model_catalog.json" ]; then
+if [ ! -f ".env" ] || ! grep -q "LLM_API_KEY=." .env || [ ! -f "data/user/settings/model_catalog.json" ]; then
     TRIGGER_SETUP=true
 fi
 
 # Allow forcing setup with --setup flag
 if [ "$1" == "--setup" ]; then TRIGGER_SETUP=true; fi
+
+# If already configured, ask if they want to reconfigure
+if [ "$TRIGGER_SETUP" = false ]; then
+    echo -e "\n${BOLD}🚀 DeepTutor is ready!${NC}"
+    echo -e "  - Press ${BOLD}Enter${NC} to start."
+    echo -e "  - Type ${YELLOW}'r'${NC} to reconfigure/reset settings."
+    printf "${BOLD}Choice: ${NC}"
+    read -r READY_CHOICE
+    if [[ "$READY_CHOICE" == "r" || "$READY_CHOICE" == "R" ]]; then
+        TRIGGER_SETUP=true
+    fi
+fi
 
 if [ "$TRIGGER_SETUP" = true ]; then
     echo -e "\n${BOLD}🔑 DeepTutor Setup${NC}"
@@ -178,9 +235,10 @@ if [ "$TRIGGER_SETUP" = true ]; then
     echo -e "  3) Anthropic"
     echo -e "  4) DeepSeek"
     echo -e "  5) Groq"
-    echo -e "  6) Ollama (Local)"
+    echo -e "  6) ${GREEN}NVIDIA NIM${NC} (Free - 80+ Models)"
+    echo -e "  7) Ollama (Local)"
     echo -e "  s) Skip / Continue to Server\n"
-    
+
     printf "${BOLD}Selection: ${NC}"
     read -r BRAIN_CHOICE
 
@@ -191,7 +249,6 @@ if [ "$TRIGGER_SETUP" = true ]; then
         case $BRAIN_CHOICE in
             1)
                 B_BINDING="gemini"; B_HOST="https://generativelanguage.googleapis.com/v1beta/openai/"; B_KEY_URL="https://aistudio.google.com/app/apikey"; B_ENV="GEMINI_API_KEY"
-
                 echo -e "\nChoose model grade:"
                 echo -e "  1) ${GREEN}Standard${NC} (Gemini 1.5 Flash - Free & Fast)"
                 echo -e "  2) ${BLUE}Power${NC} (Gemini 1.5 Pro - Smarter)"
@@ -216,34 +273,73 @@ if [ "$TRIGGER_SETUP" = true ]; then
                 ;;
             4) B_BINDING="deepseek"; B_HOST="https://api.deepseek.com"; B_KEY_URL="https://platform.deepseek.com/api_keys"; B_ENV="DEEPSEEK_API_KEY"; B_MODEL="deepseek-chat" ;;
             5) B_BINDING="groq"; B_HOST="https://api.groq.com/openai/v1"; B_KEY_URL="https://console.groq.com/keys"; B_ENV="GROQ_API_KEY"; B_MODEL="llama-3.3-70b-versatile" ;;
-            6) B_BINDING="ollama"; B_HOST="http://localhost:11434/v1"; B_ENV=""; B_MODEL="llama3.2" ;;
+            6) 
+                B_BINDING="nvidia"; B_HOST="https://integrate.api.nvidia.com/v1"; B_KEY_URL="https://build.nvidia.com/models"; B_ENV="NVIDIA_API_KEY"
+                echo -e "\nChoose model grade:"
+                echo -e "  1) ${GREEN}Standard${NC} (Llama-3.1-70B)"
+                echo -e "  2) ${BLUE}Power${NC} (Llama-3.1-405B - Best)"
+                echo -e "  3) ${NC}DeepSeek-V3${NC}"
+                printf "${BOLD}Selection [1]: ${NC}"; read -r M_GRADE
+                if [ "$M_GRADE" == "2" ]; then B_MODEL="nvidia/llama-3.1-405b-instruct"; elif [ "$M_GRADE" == "3" ]; then B_MODEL="deepseek/deepseek-v3"; else B_MODEL="nvidia/llama-3.1-70b-instruct"; fi
+                ;;
+            7) B_BINDING="ollama"; B_HOST="http://localhost:11434/v1"; B_ENV=""; B_MODEL="llama3.2" ;;
             *) echo "Skipping configuration..."; B_BINDING="" ;;
         esac
+
 
         if [ -n "$B_BINDING" ]; then
             B_KEY="ollama"
             if [ "$B_BINDING" != "ollama" ]; then
-                echo -e "\nGet your key at: ${BLUE}$B_KEY_URL${NC}"
-                printf "${YELLOW}Paste your Brain API Key: ${NC}"
+                echo -e "\n${BOLD}🔑 Get your $B_BINDING API Key at:${NC} ${BLUE}$B_KEY_URL${NC}"
+                
+                # Frictionless: attempt to open the browser
+                if [[ "$OSTYPE" == "darwin"* ]]; then
+                    open "$B_KEY_URL" 2>/dev/null || true
+                elif command -v xdg-open &> /dev/null; then
+                    xdg-open "$B_KEY_URL" 2>/dev/null || true
+                fi
+
+                printf "${YELLOW}Paste your Brain API Key (or press Enter once you have it): ${NC}"
                 read -r B_KEY
+                
+                # If they just press enter without pasting, ask again more firmly
+                while [ -z "$B_KEY" ]; do
+                    log_warn "A Brain API Key is required for $B_BINDING to work."
+                    printf "${YELLOW}Paste your Brain API Key: ${NC}"
+                    read -r B_KEY
+                done
             fi
 
             # ── PHASE 2: THE LIBRARIAN ───────────────────────────────────────
             echo -e "\n${BOLD}Step 2: Configure The Librarian (Embedding)${NC}"
             echo -e "Choose your AI provider for reading documents:"
-            echo -e "  1) ${BOLD}Same as The Brain${NC}"
+            
+            # Recommendation for Groq/DeepSeek users
+            if [[ "$B_BINDING" == "groq" || "$B_BINDING" == "deepseek" ]]; then
+                echo -e "  ${YELLOW}Note: Your chosen Brain ($B_BINDING) does not support embeddings.${NC}"
+                echo -e "  ${GREEN}Recommended: Option 7 (Ollama) for local/free Librarian.${NC}"
+            fi
+
+            echo -e "  1) Same as The Brain (Only if Brain supports it)"
             echo -e "  2) Gemini"
             echo -e "  3) OpenAI"
             echo -e "  4) Mistral"
             echo -e "  5) Voyage AI"
             echo -e "  6) Cohere"
-            echo -e "  7) Ollama (Local)"
+            echo -e "  7) ${BOLD}${GREEN}Ollama (Local & Free)${NC}"
             
             printf "${BOLD}Selection: ${NC}"
             read -r LIB_CHOICE
 
             case $LIB_CHOICE in
-                1) L_BINDING=$B_BINDING; L_HOST=$B_HOST; L_KEY=$B_KEY ;;
+                1) 
+                    if [[ "$B_BINDING" == "groq" || "$B_BINDING" == "deepseek" || "$B_BINDING" == "anthropic" ]]; then
+                        log_warn "$B_BINDING does not have a Librarian service. Switching to Ollama (Local) instead."
+                        L_BINDING="ollama"; L_HOST="http://localhost:11434"; L_KEY="ollama"
+                    else
+                        L_BINDING=$B_BINDING; L_HOST=$B_HOST; L_KEY=$B_KEY
+                    fi
+                    ;;
                 2) L_BINDING="gemini"; L_HOST="https://generativelanguage.googleapis.com/v1beta" ;;
                 3) L_BINDING="openai"; L_HOST="https://api.openai.com/v1" ;;
                 4) L_BINDING="mistral"; L_HOST="https://api.mistral.ai/v1" ;;
@@ -253,9 +349,14 @@ if [ "$TRIGGER_SETUP" = true ]; then
                 *) L_BINDING=""; echo "Skipping Librarian setup..." ;;
             esac
 
-            # Refine Gemini host: Librarian needs native v1beta, not /openai/ suffix
+            # Refine Gemini host: Librarian needs native v1beta
             if [ "$L_BINDING" == "gemini" ]; then
-                L_HOST="https://generativelanguage.googleapis.com"
+                L_HOST="https://generativelanguage.googleapis.com/v1beta"
+            fi
+            
+            # Frictionless Ollama check
+            if [ "$L_BINDING" == "ollama" ]; then
+                ensure_ollama
             fi
 
             L_MODEL=""; L_DIM=""
@@ -360,6 +461,9 @@ clear_port() {
 clear_port 8001
 clear_port 3782
 
-# 6. Launch the Setup Tour
-# We pass all arguments to the script
-"$PYTHON_EXE" scripts/start_tour.py "$@"
+# 6. Launch
+if [ "$TRIGGER_SETUP" = true ]; then
+    "$PYTHON_EXE" scripts/start_tour.py "$@"
+else
+    "$PYTHON_EXE" scripts/start_web.py "$@"
+fi

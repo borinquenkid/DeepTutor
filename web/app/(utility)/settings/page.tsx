@@ -1322,6 +1322,9 @@ function SettingsPageContent() {
                           } else if (provider.includes("anthropic") || binding.includes("anthropic")) {
                             url = "https://console.anthropic.com/settings/keys";
                             label = t("Get Anthropic Key");
+                          } else if (provider.includes("nvidia") || binding.includes("nvidia")) {
+                            url = "https://build.nvidia.com/explore/discover";
+                            label = t("Get NVIDIA Key");
                           } else if (provider.includes("groq") || binding.includes("groq")) {
                             url = "https://console.groq.com/keys";
                             label = t("Get Groq Key");
