@@ -114,7 +114,7 @@ class EnvStore:
                 "api_key": values.get("EMBEDDING_API_KEY", os.getenv("EMBEDDING_API_KEY", "")),
                 "host": values.get("EMBEDDING_HOST", os.getenv("EMBEDDING_HOST", "")),
                 "dimension": values.get(
-                    "EMBEDDING_DIMENSION", os.getenv("EMBEDDING_DIMENSION", "3072")
+                    "EMBEDDING_DIMENSION", os.getenv("EMBEDDING_DIMENSION", "")
                 ),
                 "send_dimensions": values.get(
                     "EMBEDDING_SEND_DIMENSIONS",

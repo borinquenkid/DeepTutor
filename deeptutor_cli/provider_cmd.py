@@ -12,7 +12,7 @@ def register(app: typer.Typer) -> None:
     def provider_login(
         provider: str = typer.Argument(
             ...,
-            help="Provider: gemini (Google OAuth) | openai-codex (OAuth login) | github-copilot (validate existing Copilot auth)",
+            help="Provider: openai-codex (OAuth login) | github-copilot (validate existing Copilot auth)",
         ),
     ) -> None:
         """Authenticate or validate provider access."""

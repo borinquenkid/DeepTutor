@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 
 class MathAnimatorRequestConfig(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
     output_mode: Literal["video", "image"] = "video"
     quality: Literal["low", "medium", "high"] = "medium"

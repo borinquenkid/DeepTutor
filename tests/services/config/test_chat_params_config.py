@@ -12,6 +12,9 @@ from deeptutor.services.config.loader import (
     get_chat_params,
 )
 
+import importlib
+import deeptutor.services.config.loader as loader_mod
+
 
 def _write_agents_yaml(tmp_path: Path, content: dict[str, Any]) -> Path:
     settings_dir = tmp_path / "data" / "user" / "settings"
@@ -25,10 +28,7 @@ class TestGetChatParams:
     """Verify get_chat_params() correctly resolves capabilities.chat."""
 
     def test_returns_defaults_when_file_missing(self, tmp_path: Path, monkeypatch):
-        monkeypatch.setattr(
-            "deeptutor.services.config.loader.PROJECT_ROOT",
-            tmp_path,
-        )
+        monkeypatch.setattr(loader_mod, "PROJECT_ROOT", tmp_path)
         params = get_chat_params()
         assert params == DEFAULT_CHAT_PARAMS
 
@@ -39,10 +39,7 @@ class TestGetChatParams:
                 "capabilities": {"solve": {"temperature": 0.3}},
             },
         )
-        monkeypatch.setattr(
-            "deeptutor.services.config.loader.PROJECT_ROOT",
-            project_root,
-        )
+        monkeypatch.setattr(loader_mod, "PROJECT_ROOT", project_root)
         params = get_chat_params()
         assert params["temperature"] == DEFAULT_CHAT_PARAMS["temperature"]
         assert params["responding"]["max_tokens"] == 8000
@@ -59,10 +56,7 @@ class TestGetChatParams:
                 },
             },
         )
-        monkeypatch.setattr(
-            "deeptutor.services.config.loader.PROJECT_ROOT",
-            project_root,
-        )
+        monkeypatch.setattr(loader_mod, "PROJECT_ROOT", project_root)
         params = get_chat_params()
         assert params["responding"]["max_tokens"] == 12000
         assert params["answer_now"]["max_tokens"] == 8000
@@ -76,10 +70,7 @@ class TestGetChatParams:
                 "capabilities": {"chat": {"temperature": 0.7}},
             },
         )
-        monkeypatch.setattr(
-            "deeptutor.services.config.loader.PROJECT_ROOT",
-            project_root,
-        )
+        monkeypatch.setattr(loader_mod, "PROJECT_ROOT", project_root)
         params = get_chat_params()
         assert params["temperature"] == 0.7
         assert params["responding"]["max_tokens"] == 8000
@@ -101,10 +92,7 @@ class TestGetChatParams:
                 },
             },
         )
-        monkeypatch.setattr(
-            "deeptutor.services.config.loader.PROJECT_ROOT",
-            project_root,
-        )
+        monkeypatch.setattr(loader_mod, "PROJECT_ROOT", project_root)
         params = get_chat_params()
         assert params["temperature"] == 0.4
         assert params["responding"]["max_tokens"] == 16000

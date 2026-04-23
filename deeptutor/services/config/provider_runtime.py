@@ -72,15 +72,15 @@ EMBEDDING_PROVIDERS: dict[str, EmbeddingProviderSpec] = {
         keywords=("openai", "text-embedding", "ada-002", "embedding-3"),
         is_local=False,
         api_key_envs=("OPENAI_API_KEY",),
-        default_model="text-embedding-3-large",
-        default_dim=3072,
+        default_model="text-embedding-3-small",
+        default_dim=1536,
     ),
     "gemini": EmbeddingProviderSpec(
         label="Gemini", adapter="google",
         default_api_base="https://generativelanguage.googleapis.com",
         keywords=("gemini", "google"),
         is_local=False, api_key_envs=("GEMINI_API_KEY", "GOOGLE_API_KEY"),
-        default_model="gemini-embedding-001", default_dim=3072,
+        default_model="text-embedding-004", default_dim=768,
     ),
     "azure_openai": EmbeddingProviderSpec(
         label="Azure OpenAI",
@@ -476,17 +476,19 @@ def _resolve_embedding_provider(
     api_base: str | None,
     provider_pool: dict[str, NormalizedProviderConfig],
 ) -> str:
-    if hint and hint in EMBEDDING_PROVIDERS:
-        return hint
-
     model_lower = (model or "").lower()
-    model_prefix = model_lower.split("/", 1)[0].replace("-", "_") if "/" in model_lower else ""
-    if model_prefix in EMBEDDING_PROVIDERS:
-        return model_prefix
 
+    # Strategy 1: Explicit keyword match in model name (Strongest)
     for provider_name, spec in EMBEDDING_PROVIDERS.items():
         if any(keyword in model_lower for keyword in spec.keywords):
             return provider_name
+
+    # Strategy 2: Use hint (binding) if valid
+    if hint and hint in EMBEDDING_PROVIDERS:
+        return hint
+    model_prefix = model_lower.split("/", 1)[0].replace("-", "_") if "/" in model_lower else ""
+    if model_prefix in EMBEDDING_PROVIDERS:
+        return model_prefix
 
     if _is_local_base_url(api_base):
         if api_base and "11434" in api_base:

@@ -98,7 +98,9 @@ class ModelCatalogService:
         changed = False
 
         llm_service = services.setdefault("llm", _service_shell())
-        if not llm_service.get("profiles") and (summary.llm["model"] or summary.llm["host"]):
+        if not llm_service.get("profiles") and (
+            summary.llm["model"] or summary.llm["host"] or summary.llm["api_key"]
+        ):
             profile_id = "llm-profile-default"
             model_id = "llm-model-default"
             binding = summary.llm["binding"] or "openai"
@@ -153,9 +155,7 @@ class ModelCatalogService:
             if not model_name and emb_preset:
                 model_name = emb_preset.default_model
             
-            # Favor preset dimension if explicitly defined, otherwise respect EnvStore's 3072
-            # only if the binding is actually openai.
-            if not dimension or (dimension == "3072" and binding != "openai"):
+            if not dimension:
                 if emb_preset and emb_preset.default_dim:
                     dimension = str(emb_preset.default_dim)
                 else:

@@ -3,11 +3,25 @@
 from __future__ import annotations
 
 import json
+import os
+import pytest
 from pathlib import Path
 from unittest.mock import patch
 
 from deeptutor.services.config.env_store import EnvStore
 from deeptutor.services.config.model_catalog import ModelCatalogService
+
+import importlib
+import deeptutor.services.config.provider_runtime
+importlib.reload(deeptutor.services.config.provider_runtime)
+
+
+@pytest.fixture(autouse=True)
+def clear_env(monkeypatch):
+    """Ensure no LLM/EMBEDDING environment variables leak into tests."""
+    for key in list(os.environ.keys()):
+        if key.startswith(("LLM_", "EMBEDDING_", "NVIDIA_", "GROQ_", "GEMINI_", "OPENAI_")):
+            monkeypatch.delenv(key, raising=False)
 
 
 def test_hydrate_gemini_from_env(tmp_path: Path) -> None:
@@ -74,7 +88,7 @@ def test_hydrate_openai_from_env(tmp_path: Path) -> None:
         # Check Librarian
         emb = catalog["services"]["embedding"]["profiles"][0]
         assert emb["binding"] == "openai"
-        assert emb["models"][0]["dimension"] == "3072"
+        assert emb["models"][0]["dimension"] == "1536"
 
 
 def test_hydrate_ollama_from_env(tmp_path: Path) -> None:
@@ -132,5 +146,5 @@ def test_hydrate_mixed_providers_from_env(tmp_path: Path) -> None:
         # Librarian should be OpenAI
         emb = catalog["services"]["embedding"]["profiles"][0]
         assert emb["binding"] == "openai"
-        assert emb["models"][0]["dimension"] == "3072"
-        assert emb["models"][0]["model"] == "text-embedding-3-large"
+        assert emb["models"][0]["dimension"] == "1536"
+        assert emb["models"][0]["model"] == "text-embedding-3-small"

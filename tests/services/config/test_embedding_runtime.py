@@ -9,6 +9,10 @@ import pytest
 from deeptutor.services.config.env_store import EnvStore
 from deeptutor.services.config.provider_runtime import resolve_embedding_runtime_config
 
+import importlib
+import deeptutor.services.config.provider_runtime
+importlib.reload(deeptutor.services.config.provider_runtime)
+
 
 def _build_catalog(
     *,
